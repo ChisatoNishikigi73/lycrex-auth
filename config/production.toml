@@ -1,0 +1,23 @@
+# 生产环境配置
+# 这里的配置会覆盖default.toml中的同名配置
+
+[server]
+host = "0.0.0.0"  # 生产环境监听所有接口
+port = 8080
+secret_key = "这里应该替换为强随机密钥"
+
+[database]
+# 生产环境数据库连接应使用环境变量注入
+# url将从APP_DATABASE_URL环境变量获取
+
+[cors]
+allowed_origins = [
+    "https://yourdomain.com"
+]
+
+[log]
+level = "info"
+format = "json"  # 生产环境使用JSON格式日志便于收集
+
+[security]
+# 生产环境使用默认的令牌生命周期 

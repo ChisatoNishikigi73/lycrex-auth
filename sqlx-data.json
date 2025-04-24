@@ -1,0 +1,15 @@
+{
+  "db": "PostgreSQL",
+  "0d4e2d7f1c76e75c0c6ddd3d5e8f9dc85d2b4ab5e5a9d8e1cb11c0d4c4bc80d1": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Timestamptz"
+        ]
+      }
+    },
+    "query": "DELETE FROM tokens WHERE expires_at < $1"
+  }
+} 

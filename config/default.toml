@@ -1,0 +1,35 @@
+# 默认配置文件
+# 所有环境共用的基础配置
+
+[server]
+host = "127.0.0.1"
+port = 8080
+secret_key = "开发环境密钥，请在生产环境中替换"
+
+[database]
+url = "postgres://kawaaanime@localhost/lycrex_auth"
+
+[cors]
+allowed_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:8080",
+    "http://localhost:8080"
+]
+
+[log]
+level = "info"
+format = "default"
+# 特定模块的日志级别配置
+[log.modules]
+# SQLx查询日志级别设置为trace
+"sqlx::query" = "trace"
+"sqlx" = "warn"
+
+[security]
+# 访问令牌有效期（秒）
+access_token_lifetime = 3600
+# 刷新令牌有效期（天）
+refresh_token_lifetime = 30
+# 授权码有效期（秒）
+authorization_code_lifetime = 600 
