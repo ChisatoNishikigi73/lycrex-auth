@@ -10,6 +10,7 @@ use crate::services::user as user_service;
 pub struct UpdateUserRequest {
     username: Option<String>,
     email: Option<String>,
+    avatar_url: Option<String>,
 }
 
 // 获取当前用户信息
@@ -52,6 +53,7 @@ pub async fn update_user(
         user_id,
         update.username.clone(),
         update.email.clone(),
+        update.avatar_url.clone(),
         &db,
     )
     .await

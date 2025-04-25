@@ -49,6 +49,13 @@ pub struct SecurityConfig {
     pub authorization_code_lifetime: i64,
 }
 
+/// 管理员配置
+#[derive(Debug, Deserialize, Clone)]
+pub struct AdminConfig {
+    /// 管理员密码，用于管理后台登录和添加/删除提供方
+    pub password: String,
+}
+
 /// 应用程序全局配置
 #[derive(Debug, Deserialize, Clone)]
 pub struct Config {
@@ -62,6 +69,8 @@ pub struct Config {
     pub log: LogConfig,
     /// 安全配置
     pub security: SecurityConfig,
+    /// 管理员配置
+    pub admin: AdminConfig,
 }
 
 // 全局静态配置实例
@@ -78,7 +87,7 @@ impl Config {
     pub fn load() -> Result<Self, ConfigError> {
         // 获取运行环境
         let environment = env::var("RUN_ENV").unwrap_or_else(|_| String::from("development"));
-        info!("加载配置环境: {}", environment);
+        println!("加载配置环境: {}", environment);
         
         // 获取配置目录
         let config_dir = env::var("CONFIG_DIR").unwrap_or_else(|_| String::from("config"));
@@ -158,6 +167,9 @@ impl Default for Config {
                 access_token_lifetime: 3600,
                 refresh_token_lifetime: 30,
                 authorization_code_lifetime: 600,
+            },
+            admin: AdminConfig {
+                password: "admin123".to_string(), // 默认密码，生产环境应该更改
             },
         }
     }

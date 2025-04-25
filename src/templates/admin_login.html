@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理员登录</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .login-container {
+            max-width: 400px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            color: white;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        input[type="password"] {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            margin-bottom: 20px;
+        }
+        input[type="password"]:focus {
+            background-color: rgba(255, 255, 255, 0.15);
+            outline: none;
+        }
+        label {
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 5px;
+            display: block;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            width: 100%;
+            padding: 12px;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .error {
+            color: #e74c3c;
+            margin-bottom: 15px;
+            text-align: center;
+            font-weight: bold;
+            background-color: rgba(231, 76, 60, 0.2);
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h1>管理员登录</h1>
+        
+        <div class="error" id="error-message" style="display: none;"></div>
+        
+        <form id="login-form">
+            <div>
+                <label for="admin_password">管理员密码</label>
+                <input type="password" id="admin_password" name="admin_password" required placeholder="请输入管理员密码" autofocus>
+            </div>
+            
+            <button type="submit">登录</button>
+        </form>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('login-form');
+            const errorMessage = document.getElementById('error-message');
+            
+            // 添加表单提交事件
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const password = document.getElementById('admin_password').value;
+                
+                // 发送登录请求
+                fetch('/admin/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        password: password
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(data => {
+                            throw new Error(data.error || `登录失败: ${response.status}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        // 登录成功，跳转到管理页面
+                        window.location.href = '/admin';
+                    } else {
+                        errorMessage.textContent = data.error || '登录失败，请检查密码';
+                        errorMessage.style.display = 'block';
+                    }
+                })
+                .catch(error => {
+                    errorMessage.textContent = error.message;
+                    errorMessage.style.display = 'block';
+                });
+            });
+        });
+    </script>
+</body>
+</html> 

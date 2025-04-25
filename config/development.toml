@@ -21,4 +21,8 @@ format = "pretty"
 
 [security]
 # 开发环境使用较短的令牌生命周期方便测试
-access_token_lifetime = 1800 
+access_token_lifetime = 1800
+
+[admin]
+# 开发环境管理员密码
+password = "dev123" 

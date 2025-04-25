@@ -5,7 +5,9 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL
+    updated_at TIMESTAMPTZ NOT NULL,
+    email_verified BOOLEAN NOT NULL DEFAULT false,
+    avatar_url TEXT
 );
 
 -- 创建客户端表
@@ -52,10 +54,10 @@ CREATE TABLE IF NOT EXISTS tokens (
 );
 
 -- 创建索引
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_clients_client_id ON clients(client_id);
-CREATE INDEX idx_authorizations_code ON authorizations(code);
-CREATE INDEX idx_tokens_access_token ON tokens(access_token);
-CREATE INDEX idx_tokens_refresh_token ON tokens(refresh_token);
-CREATE INDEX idx_tokens_user_id ON tokens(user_id);
-CREATE INDEX idx_tokens_client_id ON tokens(client_id); 
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_clients_client_id ON clients(client_id);
+CREATE INDEX IF NOT EXISTS idx_authorizations_code ON authorizations(code);
+CREATE INDEX IF NOT EXISTS idx_tokens_access_token ON tokens(access_token);
+CREATE INDEX IF NOT EXISTS idx_tokens_refresh_token ON tokens(refresh_token);
+CREATE INDEX IF NOT EXISTS idx_tokens_user_id ON tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_tokens_client_id ON tokens(client_id);

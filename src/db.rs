@@ -85,122 +85,43 @@ pub async fn create_database(database_url: &str) -> Result<()> {
     Ok(())
 }
 
-/// 初始化数据库表结构
-pub async fn init_database_tables(pool: &DbPool) -> Result<()> {
-    info!("正在初始化数据库表...");
+/// 简化的数据库表结构验证
+pub async fn validate_database_structure(pool: &DbPool) -> Result<()> {
+    info!("验证数据库结构...");
     
-    // 创建用户表
-    sqlx::query(
-        "CREATE TABLE IF NOT EXISTS users (
-            id UUID PRIMARY KEY,
-            username VARCHAR(255) NOT NULL,
-            email VARCHAR(255) NOT NULL UNIQUE,
-            password_hash VARCHAR(255) NOT NULL,
-            created_at TIMESTAMPTZ NOT NULL,
-            updated_at TIMESTAMPTZ NOT NULL
-        );"
-    ).execute(pool).await?;
+    // 检查users表是否存在
+    let users_table_exists = sqlx::query("SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'users'
+    )")
+    .fetch_one(pool)
+    .await?
+    .get::<bool, _>(0);
     
-    // 创建客户端表
-    sqlx::query(
-        "CREATE TABLE IF NOT EXISTS clients (
-            id UUID PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
-            client_id VARCHAR(255) NOT NULL UNIQUE,
-            client_secret VARCHAR(255) NOT NULL,
-            redirect_uris TEXT[] NOT NULL,
-            allowed_grant_types TEXT[] NOT NULL,
-            allowed_scopes TEXT[] NOT NULL,
-            user_id UUID REFERENCES users(id),
-            created_at TIMESTAMPTZ NOT NULL,
-            updated_at TIMESTAMPTZ NOT NULL
-        );"
-    ).execute(pool).await?;
+    if !users_table_exists {
+        return Err(anyhow!("用户表不存在，请确保数据库结构正确"));
+    }
     
-    // 创建授权表
-    sqlx::query(
-        "CREATE TABLE IF NOT EXISTS authorizations (
-            id UUID PRIMARY KEY,
-            user_id UUID NOT NULL REFERENCES users(id),
-            client_id UUID NOT NULL REFERENCES clients(id),
-            code VARCHAR(255) NOT NULL UNIQUE,
-            redirect_uri TEXT NOT NULL,
-            scope TEXT,
-            expires_at TIMESTAMPTZ NOT NULL,
-            created_at TIMESTAMPTZ NOT NULL,
-            used BOOLEAN NOT NULL DEFAULT FALSE,
-            UNIQUE(user_id, client_id, code)
-        );"
-    ).execute(pool).await?;
+    // 检查clients表是否存在
+    let clients_table_exists = sqlx::query("SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'clients'
+    )")
+    .fetch_one(pool)
+    .await?
+    .get::<bool, _>(0);
     
-    // 创建令牌表
-    sqlx::query(
-        "CREATE TABLE IF NOT EXISTS tokens (
-            id UUID PRIMARY KEY,
-            access_token VARCHAR(255) NOT NULL UNIQUE,
-            refresh_token VARCHAR(255) UNIQUE,
-            token_type VARCHAR(50) NOT NULL,
-            expires_at TIMESTAMPTZ NOT NULL,
-            scope TEXT,
-            user_id UUID NOT NULL REFERENCES users(id),
-            client_id UUID NOT NULL REFERENCES clients(id),
-            created_at TIMESTAMPTZ NOT NULL,
-            updated_at TIMESTAMPTZ NOT NULL,
-            revoked BOOLEAN NOT NULL DEFAULT FALSE
-        );"
-    ).execute(pool).await?;
+    if !clients_table_exists {
+        return Err(anyhow!("客户端表不存在，请确保数据库结构正确"));
+    }
     
-    // 创建索引
-    sqlx::query("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);")
-        .execute(pool).await?;
-    sqlx::query("CREATE INDEX IF NOT EXISTS idx_clients_client_id ON clients(client_id);")
-        .execute(pool).await?;
-    sqlx::query("CREATE INDEX IF NOT EXISTS idx_authorizations_code ON authorizations(code);")
-        .execute(pool).await?;
-    sqlx::query("CREATE INDEX IF NOT EXISTS idx_tokens_access_token ON tokens(access_token);")
-        .execute(pool).await?;
-    sqlx::query("CREATE INDEX IF NOT EXISTS idx_tokens_refresh_token ON tokens(refresh_token);")
-        .execute(pool).await?;
-    sqlx::query("CREATE INDEX IF NOT EXISTS idx_tokens_user_id ON tokens(user_id);")
-        .execute(pool).await?;
-    sqlx::query("CREATE INDEX IF NOT EXISTS idx_tokens_client_id ON tokens(client_id);")
-        .execute(pool).await?;
-    
-    // 插入测试客户端
-    sqlx::query(
-        "DO $$ 
-        BEGIN
-            IF NOT EXISTS (SELECT 1 FROM clients WHERE client_id = 'test_client') THEN
-                INSERT INTO clients (
-                    id, 
-                    name, 
-                    client_id, 
-                    client_secret, 
-                    redirect_uris, 
-                    allowed_grant_types, 
-                    allowed_scopes, 
-                    created_at, 
-                    updated_at
-                ) VALUES (
-                    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 
-                    '测试客户端', 
-                    'test_client', 
-                    'test_secret', 
-                    ARRAY['http://localhost:3000/callback'], 
-                    ARRAY['authorization_code', 'refresh_token'], 
-                    ARRAY['profile', 'email'], 
-                    NOW(), 
-                    NOW()
-                );
-            END IF;
-        END $$;"
-    ).execute(pool).await?;
-    
-    info!("数据库表初始化成功");
+    info!("数据库结构验证完成");
     Ok(())
 }
 
-/// 初始化数据库连接池并确保数据库和表结构存在
+/// 初始化数据库连接池并验证数据库结构
 pub async fn init_pool(config: &Config) -> Result<DbPool> {
     let database_url = &config.database.url;
     info!("检查数据库 '{}'", database_url);
@@ -218,10 +139,12 @@ pub async fn init_pool(config: &Config) -> Result<DbPool> {
                 
                 if answer.trim().to_lowercase() == "y" {
                     match create_database(database_url).await {
-                        Ok(_) => info!("数据库创建成功"),
+                        Ok(_) => {
+                            error!("数据库已创建，但需要手动初始化数据库结构");
+                            process::exit(1);
+                        },
                         Err(e) => {
                             error!("创建数据库失败: {}", e);
-                            error!("无法继续执行，程序将退出");
                             process::exit(1);
                         }
                     }
@@ -234,23 +157,8 @@ pub async fn init_pool(config: &Config) -> Result<DbPool> {
             }
         },
         Err(e) => {
-            error!("检查数据库存在性失败: {}", e);
-            print!("无法检查数据库是否存在，是否尝试创建？[y/n]: ");
-            io::stdout().flush().unwrap();
-            
-            let mut answer = String::new();
-            io::stdin().read_line(&mut answer)?;
-            
-            if answer.trim().to_lowercase() == "y" {
-                if let Err(e) = create_database(database_url).await {
-                    error!("创建数据库失败: {}", e);
-                    error!("无法继续执行，程序将退出");
-                    process::exit(1);
-                }
-            } else {
-                error!("用户取消数据库创建，程序将退出");
-                process::exit(1);
-            }
+            error!("检查数据库失败: {}", e);
+            process::exit(1);
         }
     }
     
@@ -271,10 +179,10 @@ pub async fn init_pool(config: &Config) -> Result<DbPool> {
             }
         };
     
-    // 初始化数据库表
-    if let Err(e) = init_database_tables(&pool).await {
-        error!("初始化数据库表失败: {}", e);
-        error!("请确保数据库结构正确");
+    // 验证数据库结构
+    if let Err(e) = validate_database_structure(&pool).await {
+        error!("数据库结构验证失败: {}", e);
+        error!("请确保数据库结构已正确初始化");
         process::exit(1);
     }
     

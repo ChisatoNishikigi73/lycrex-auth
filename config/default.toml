@@ -32,4 +32,9 @@ access_token_lifetime = 3600
 # 刷新令牌有效期（天）
 refresh_token_lifetime = 30
 # 授权码有效期（秒）
-authorization_code_lifetime = 600 
+authorization_code_lifetime = 600
+
+[admin]
+# 管理员密码，用于管理后台登录
+# 生产环境中应该修改此密码
+password = "admin123" 

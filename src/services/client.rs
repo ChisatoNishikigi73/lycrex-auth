@@ -45,6 +45,56 @@ pub async fn create_client(
     Ok(client)
 }
 
+/// 使用自定义client_id和client_secret创建提供方客户端
+pub async fn create_provider_client(
+    client: &ClientCreate,
+    client_id_str: &str,
+    client_secret: &str,
+    user_id: Option<Uuid>,
+    db: &PgPool,
+) -> AppResult<Client> {
+    let now = Utc::now();
+    let client_id = Uuid::new_v4();
+    
+    // 检查client_id是否已存在
+    let exists = query("SELECT 1 FROM clients WHERE client_id = $1")
+        .bind(client_id_str)
+        .fetch_optional(db)
+        .await
+        .map_err(AppError::DatabaseError)?
+        .is_some();
+        
+    if exists {
+        return Err(AppError::BadRequest("客户端ID已存在".to_string()));
+    }
+    
+    // 创建客户端
+    let client = query_as::<_, Client>(
+        r#"
+        INSERT INTO clients (
+            id, name, client_id, client_secret, redirect_uris, 
+            allowed_grant_types, allowed_scopes, user_id, created_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING *
+        "#)
+    .bind(client_id)
+    .bind(&client.name)
+    .bind(client_id_str)
+    .bind(client_secret)
+    .bind(&client.redirect_uris)
+    .bind(&client.allowed_grant_types)
+    .bind(&client.allowed_scopes)
+    .bind(user_id)
+    .bind(now)
+    .bind(now)
+    .fetch_one(db)
+    .await
+    .map_err(AppError::DatabaseError)?;
+    
+    Ok(client)
+}
+
 pub async fn get_client_by_id(id: Uuid, db: &PgPool) -> AppResult<ClientResponse> {
     let client = query_as::<_, Client>(r#"SELECT * FROM clients WHERE id = $1"#)
     .bind(id)
@@ -54,6 +104,16 @@ pub async fn get_client_by_id(id: Uuid, db: &PgPool) -> AppResult<ClientResponse
     .ok_or_else(|| AppError::NotFound("客户端未找到".to_string()))?;
     
     Ok(ClientResponse::from(client))
+}
+
+/// 获取所有客户端
+pub async fn get_all_clients(db: &PgPool) -> AppResult<Vec<ClientResponse>> {
+    let clients = query_as::<_, Client>(r#"SELECT * FROM clients ORDER BY created_at DESC"#)
+        .fetch_all(db)
+        .await
+        .map_err(AppError::DatabaseError)?;
+    
+    Ok(clients.into_iter().map(ClientResponse::from).collect())
 }
 
 pub async fn get_clients_by_user(user_id: Uuid, db: &PgPool) -> AppResult<Vec<ClientResponse>> {

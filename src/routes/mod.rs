@@ -2,8 +2,10 @@ mod auth;
 mod clients;
 mod users;
 mod pages;
+mod admin;
 
 use actix_web::web;
+use crate::utils::static_files::serve_static_file;
 
 /// 配置所有路由
 /// 
@@ -17,6 +19,18 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .configure(users::configure_routes)
     );
     
+    // 管理员路由
+    cfg.configure(admin::configure_routes);
+    
     // 页面路由
     cfg.configure(pages::configure_routes);
+    
+    // 静态文件路由
+    cfg.service(
+        web::resource("/static/{path:.*}")
+            .route(web::get().to(|path: web::Path<String>| {
+                let file_path = path.into_inner();
+                serve_static_file(file_path)
+            }))
+    );
 } 

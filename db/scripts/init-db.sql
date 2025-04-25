@@ -5,7 +5,9 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL
+    updated_at TIMESTAMPTZ NOT NULL,
+    email_verified BOOLEAN NOT NULL DEFAULT false,
+    avatar_url TEXT
 );
 
 -- 创建客户端表
@@ -59,32 +61,3 @@ CREATE INDEX IF NOT EXISTS idx_tokens_access_token ON tokens(access_token);
 CREATE INDEX IF NOT EXISTS idx_tokens_refresh_token ON tokens(refresh_token);
 CREATE INDEX IF NOT EXISTS idx_tokens_user_id ON tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_tokens_client_id ON tokens(client_id);
-
--- 插入测试客户端（如果不存在）
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM clients WHERE client_id = 'test_client') THEN
-        INSERT INTO clients (
-            id, 
-            name, 
-            client_id, 
-            client_secret, 
-            redirect_uris, 
-            allowed_grant_types, 
-            allowed_scopes, 
-            created_at, 
-            updated_at
-        ) VALUES (
-            'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 
-            '测试客户端', 
-            'test_client', 
-            'test_secret', 
-            ARRAY['http://localhost:3000/callback'], 
-            ARRAY['authorization_code', 'refresh_token'], 
-            ARRAY['profile', 'email'], 
-            NOW(), 
-            NOW()
-        );
-    END IF;
-END
-$$; 

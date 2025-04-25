@@ -38,8 +38,8 @@ pub async fn create_user(user: &UserCreate, db: &PgPool) -> AppResult<User> {
     
     let user = query_as::<_, User>(
         r#"
-        INSERT INTO users (id, username, email, password_hash, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO users (id, username, email, password_hash, created_at, updated_at, email_verified, avatar_url)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *
         "#)
     .bind(user_id)
@@ -48,6 +48,8 @@ pub async fn create_user(user: &UserCreate, db: &PgPool) -> AppResult<User> {
     .bind(&password_hash)
     .bind(now)
     .bind(now)
+    .bind(false) // 默认email_verified为false
+    .bind(None::<String>) // 默认avatar_url为None
     .fetch_one(db)
     .await
     .map_err(AppError::DatabaseError)?;
@@ -70,6 +72,7 @@ pub async fn update_user(
     id: Uuid,
     username: Option<String>,
     email: Option<String>,
+    avatar_url: Option<String>,
     db: &PgPool,
 ) -> AppResult<UserResponse> {
     // 检查用户是否存在
@@ -83,6 +86,7 @@ pub async fn update_user(
     // 更新字段
     let username = username.unwrap_or_else(|| user.username.clone());
     let email = email.unwrap_or_else(|| user.email.clone());
+    let avatar_url = avatar_url.or(user.avatar_url);
     let now = Utc::now();
     
     // 如果邮箱被修改，检查是否已被使用
@@ -103,12 +107,47 @@ pub async fn update_user(
     let updated_user = query_as::<_, User>(
         r#"
         UPDATE users
-        SET username = $1, email = $2, updated_at = $3
-        WHERE id = $4
+        SET username = $1, email = $2, updated_at = $3, avatar_url = $4
+        WHERE id = $5
         RETURNING *
         "#)
     .bind(&username)
     .bind(&email)
+    .bind(now)
+    .bind(&avatar_url)
+    .bind(id)
+    .fetch_one(db)
+    .await
+    .map_err(AppError::DatabaseError)?;
+    
+    Ok(UserResponse::from(updated_user))
+}
+
+#[allow(dead_code)]
+pub async fn update_user_email_verified(
+    id: Uuid,
+    email_verified: bool,
+    db: &PgPool,
+) -> AppResult<UserResponse> {
+    // 检查用户是否存在
+    let _ = query_as::<_, User>(r#"SELECT * FROM users WHERE id = $1"#)
+    .bind(id)
+    .fetch_optional(db)
+    .await
+    .map_err(AppError::DatabaseError)?
+    .ok_or_else(|| AppError::NotFound("用户未找到".to_string()))?;
+    
+    // 更新邮箱验证状态
+    let now = Utc::now();
+    
+    let updated_user = query_as::<_, User>(
+        r#"
+        UPDATE users
+        SET email_verified = $1, updated_at = $2
+        WHERE id = $3
+        RETURNING *
+        "#)
+    .bind(email_verified)
     .bind(now)
     .bind(id)
     .fetch_one(db)

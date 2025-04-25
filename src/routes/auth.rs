@@ -1,13 +1,12 @@
 use actix_web::web;
 use crate::handlers::auth as auth_handlers;
-use crate::middleware::auth::Auth;
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/oauth")
             .route("/authorize", web::get().to(auth_handlers::authorize))
             .route("/token", web::post().to(auth_handlers::token))
-            .route("/userinfo", web::get().to(auth_handlers::userinfo).wrap(Auth))
+            .route("/userinfo", web::get().to(auth_handlers::userinfo))
     );
     
     cfg.service(

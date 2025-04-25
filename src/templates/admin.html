@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>提供方管理</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        .container {
+            max-width: 800px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: white;
+        }
+        input[type="text"],
+        input[type="password"] {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        input[type="text"]:focus,
+        input[type="password"]:focus {
+            background-color: rgba(255, 255, 255, 0.15);
+            outline: none;
+        }
+        label {
+            color: rgba(255, 255, 255, 0.9);
+        }
+        button {
+            width: auto;
+            background-color: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .delete-btn {
+            background-color: #e74c3c;
+        }
+        .delete-btn:hover {
+            background-color: #c0392b;
+        }
+        .edit-btn {
+            background-color: #f39c12;
+        }
+        .edit-btn:hover {
+            background-color: #d35400;
+        }
+        .logout-btn {
+            background-color: rgba(149, 165, 166, 0.4);
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+        .logout-btn:hover {
+            background-color: rgba(149, 165, 166, 0.6);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+        }
+        .modal-content {
+            background-color: #111;
+            color: white;
+            margin: 10% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 60%;
+            max-width: 500px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 10px;
+        }
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover {
+            color: white;
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+        }
+        table {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        th {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>提供方管理界面</h1>
+            <a href="/admin/logout"><button class="logout-btn">退出登录</button></a>
+        </div>
+        
+        <form id="provider-form">
+            <div class="error" id="error-message" style="display: none;"></div>
+            <div class="success" id="success-message" style="display: none;"></div>
+            
+            <div>
+                <label for="name">名称</label>
+                <input type="text" id="name" name="name" required placeholder="提供方名称">
+            </div>
+            
+            <div>
+                <label for="client_id">Client ID</label>
+                <input type="text" id="client_id" name="client_id" required placeholder="提供方Client ID">
+            </div>
+            
+            <div>
+                <label for="client_secret">Client Secret</label>
+                <input type="text" id="client_secret" name="client_secret" required placeholder="提供方Client Secret">
+            </div>
+            
+            <div>
+                <label for="redirect_uris">重定向URI（用逗号分隔多个）</label>
+                <input type="text" id="redirect_uris" name="redirect_uris" required placeholder="https://example.com/callback">
+            </div>
+            
+            <button type="submit">添加提供方</button>
+        </form>
+        
+        <h2>现有提供方列表</h2>
+        <table id="providers-table">
+            <thead>
+                <tr>
+                    <th>名称</th>
+                    <th>Client ID</th>
+                    <th>重定向URI</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="providers-list">
+                <!-- 提供方列表将动态加载 -->
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- 编辑提供方的模态框 -->
+    <div id="edit-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>编辑提供方</h2>
+                <span class="close">&times;</span>
+            </div>
+            <form id="edit-form">
+                <input type="hidden" id="edit-id">
+                
+                <div>
+                    <label for="edit-name">名称</label>
+                    <input type="text" id="edit-name" name="edit-name" required placeholder="提供方名称">
+                </div>
+                
+                <div>
+                    <label for="edit-redirect-uris">重定向URI（用逗号分隔多个）</label>
+                    <input type="text" id="edit-redirect-uris" name="edit-redirect-uris" required placeholder="https://example.com/callback">
+                </div>
+                
+                <button type="submit">保存修改</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 加载提供方列表
+            loadProviders();
+            
+            // 添加提供方表单提交处理
+            const form = document.getElementById('provider-form');
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const name = document.getElementById('name').value;
+                const clientId = document.getElementById('client_id').value;
+                const clientSecret = document.getElementById('client_secret').value;
+                const redirectUris = document.getElementById('redirect_uris').value.split(',').map(uri => uri.trim());
+                
+                // 发送到服务器
+                fetch('/admin/api/providers', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name,
+                        client_id: clientId,
+                        client_secret: clientSecret,
+                        redirect_uris: redirectUris
+                    })
+                })
+                .then(response => {
+                    // 检查HTTP状态码
+                    if (!response.ok) {
+                        return response.json().then(data => {
+                            // 如果会话过期需要重新登录
+                            if (response.status === 401) {
+                                window.location.href = '/admin/login';
+                                throw new Error('会话已过期，请重新登录');
+                            }
+                            throw new Error(data.error || `HTTP错误: ${response.status}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.error) {
+                        showError(data.error);
+                    } else {
+                        showSuccess('提供方添加成功！');
+                        form.reset();
+                        loadProviders();
+                    }
+                })
+                .catch(error => {
+                    showError('请求出错: ' + error.message);
+                });
+            });
+            
+            // 模态框控制
+            const modal = document.getElementById('edit-modal');
+            const closeBtn = document.querySelector('.close');
+            
+            closeBtn.addEventListener('click', function() {
+                modal.style.display = 'none';
+            });
+            
+            window.addEventListener('click', function(event) {
+                if (event.target === modal) {
+                    modal.style.display = 'none';
+                }
+            });
+            
+            // 编辑表单提交处理
+            const editForm = document.getElementById('edit-form');
+            editForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const id = document.getElementById('edit-id').value;
+                const name = document.getElementById('edit-name').value;
+                const redirectUris = document.getElementById('edit-redirect-uris').value.split(',').map(uri => uri.trim());
+                
+                updateProvider(id, name, redirectUris);
+            });
+        });
+        
+        // 加载提供方列表
+        function loadProviders() {
+            // 从服务器获取提供方列表
+            fetch('/admin/api/providers')
+                .then(response => {
+                    // 检查HTTP状态码
+                    if (!response.ok) {
+                        return response.json().then(data => {
+                            // 如果会话过期需要重新登录
+                            if (response.status === 401) {
+                                window.location.href = '/admin/login';
+                                throw new Error('会话已过期，请重新登录');
+                            }
+                            throw new Error(data.error || `HTTP错误: ${response.status}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const providersList = document.getElementById('providers-list');
+                    providersList.innerHTML = '';
+                    
+                    if (data.error) {
+                        showError(data.error);
+                        return;
+                    }
+                    
+                    if (data.length === 0) {
+                        providersList.innerHTML = '<tr><td colspan="4">暂无提供方</td></tr>';
+                        return;
+                    }
+                    
+                    data.forEach(provider => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${provider.name}</td>
+                            <td>${provider.client_id}</td>
+                            <td>${provider.redirect_uris.join(', ')}</td>
+                            <td class="actions">
+                                <button class="edit-btn" data-id="${provider.id}" 
+                                    data-name="${provider.name}" 
+                                    data-redirect-uris="${provider.redirect_uris.join(',')}">
+                                    编辑
+                                </button>
+                                <button class="delete-btn" data-id="${provider.id}">删除</button>
+                            </td>
+                        `;
+                        providersList.appendChild(row);
+                    });
+                    
+                    // 为删除按钮添加事件监听
+                    document.querySelectorAll('.delete-btn').forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            const providerId = this.getAttribute('data-id');
+                            if (confirm('确定要删除这个提供方吗？')) {
+                                deleteProvider(providerId);
+                            }
+                        });
+                    });
+                    
+                    // 为编辑按钮添加事件监听
+                    document.querySelectorAll('.edit-btn').forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            const providerId = this.getAttribute('data-id');
+                            const name = this.getAttribute('data-name');
+                            const redirectUris = this.getAttribute('data-redirect-uris');
+                            
+                            showEditModal(providerId, name, redirectUris);
+                        });
+                    });
+                })
+                .catch(error => {
+                    showError('加载提供方列表出错: ' + error.message);
+                });
+        }
+        
+        // 显示编辑模态框
+        function showEditModal(id, name, redirectUris) {
+            const modal = document.getElementById('edit-modal');
+            document.getElementById('edit-id').value = id;
+            document.getElementById('edit-name').value = name;
+            document.getElementById('edit-redirect-uris').value = redirectUris;
+            
+            modal.style.display = 'block';
+        }
+        
+        // 更新提供方
+        function updateProvider(id, name, redirectUris) {
+            fetch(`/admin/api/providers/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    name: name,
+                    redirect_uris: redirectUris
+                })
+            })
+            .then(response => {
+                // 检查HTTP状态码
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        // 如果会话过期需要重新登录
+                        if (response.status === 401) {
+                            window.location.href = '/admin/login';
+                            throw new Error('会话已过期，请重新登录');
+                        }
+                        throw new Error(data.error || `HTTP错误: ${response.status}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    document.getElementById('edit-modal').style.display = 'none';
+                    showSuccess('提供方更新成功！');
+                    loadProviders();
+                }
+            })
+            .catch(error => {
+                showError('更新提供方出错: ' + error.message);
+            });
+        }
+        
+        // 删除提供方
+        function deleteProvider(providerId) {
+            fetch(`/admin/api/providers/${providerId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                // 检查HTTP状态码
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        // 如果会话过期需要重新登录
+                        if (response.status === 401) {
+                            window.location.href = '/admin/login';
+                            throw new Error('会话已过期，请重新登录');
+                        }
+                        throw new Error(data.error || `HTTP错误: ${response.status}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    showSuccess('提供方删除成功！');
+                    loadProviders();
+                }
+            })
+            .catch(error => {
+                showError('删除提供方出错: ' + error.message);
+            });
+        }
+        
+        // 显示错误信息
+        function showError(message) {
+            const errorElement = document.getElementById('error-message');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+            errorElement.className = 'error';
+            document.getElementById('success-message').style.display = 'none';
+            
+            // 5秒后自动隐藏
+            setTimeout(() => {
+                errorElement.style.display = 'none';
+            }, 5000);
+        }
+        
+        // 显示成功信息
+        function showSuccess(message) {
+            const successElement = document.getElementById('success-message');
+            successElement.textContent = message;
+            successElement.style.display = 'block';
+            successElement.className = 'success';
+            document.getElementById('error-message').style.display = 'none';
+            
+            // 5秒后自动隐藏
+            setTimeout(() => {
+                successElement.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html> 

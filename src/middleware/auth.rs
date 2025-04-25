@@ -56,6 +56,17 @@ where
     forward_ready!(service);
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
+        // 获取请求的所有头部信息并记录
+        let headers = req.headers();
+        let mut headers_str = String::new();
+        for (key, value) in headers.iter() {
+            if let Ok(v) = value.to_str() {
+                headers_str.push_str(&format!("{}: {}, ", key, v));
+            }
+        }
+        log::info!("认证中间件请求头: {}", headers_str);
+        log::info!("认证中间件请求路径: {}, 方法: {}", req.path(), req.method());
+        
         // 从请求头中获取authorization
         let auth_header = req.headers().get("Authorization");
         
@@ -82,7 +93,7 @@ where
         }
         
         let token = auth_header[7..].to_string();
-        log::info!("处理Token验证请求: {}", req.path());
+        log::info!("处理Token验证请求: {}, 令牌: {}", req.path(), token);
         
         // 只验证JWT令牌，不查询数据库
         let token_data = match jwt::verify_token(&token) {

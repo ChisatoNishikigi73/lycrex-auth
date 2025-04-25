@@ -12,7 +12,8 @@ secret_key = "这里应该替换为强随机密钥"
 
 [cors]
 allowed_origins = [
-    "https://yourdomain.com"
+    "https://yourdomain.com",
+    "https://oauth.lycrex.com"
 ]
 
 [log]
@@ -20,4 +21,9 @@ level = "info"
 format = "json"  # 生产环境使用JSON格式日志便于收集
 
 [security]
-# 生产环境使用默认的令牌生命周期 
+# 生产环境使用默认的令牌生命周期
+
+[admin]
+# 生产环境管理员密码
+# 强烈建议使用环境变量设置此密码: APP_ADMIN_PASSWORD
+password = "请替换为强密码！" 

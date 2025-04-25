@@ -17,4 +17,8 @@ format = "default"
 # 测试环境使用较短的令牌生命周期
 access_token_lifetime = 60
 refresh_token_lifetime = 1
-authorization_code_lifetime = 60 
+authorization_code_lifetime = 60
+
+[admin]
+# 测试环境管理员密码
+password = "test123" 
