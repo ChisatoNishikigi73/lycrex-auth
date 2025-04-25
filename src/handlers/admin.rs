@@ -5,8 +5,8 @@ use uuid::Uuid;
 use actix_session::Session;
 
 use crate::config::Config;
-use crate::models::ClientCreate;
-use crate::services::client as client_service;
+use crate::models::{ClientCreate, UserCreate};
+use crate::services::{client as client_service, user as user_service};
 
 /// 创建提供方请求数据结构
 #[derive(Debug, Deserialize)]
@@ -35,6 +35,39 @@ pub struct UpdateProviderRequest {
 pub struct AdminLoginRequest {
     /// 管理员密码
     pub password: String,
+}
+
+/// 创建用户请求数据结构
+#[derive(Debug, Deserialize)]
+pub struct CreateUserRequest {
+    /// 用户名
+    pub username: String,
+    /// 邮箱
+    pub email: String,
+    /// 密码
+    pub password: String,
+}
+
+/// 更新用户请求数据结构
+#[derive(Debug, Deserialize)]
+pub struct UpdateUserRequest {
+    /// 用户名
+    pub username: Option<String>,
+    /// 邮箱
+    pub email: Option<String>,
+    /// 头像URL
+    pub avatar_url: Option<String>,
+}
+
+/// 用户列表查询参数
+#[derive(Debug, Deserialize)]
+pub struct UserListParams {
+    /// 页码，从1开始
+    pub page: Option<u32>,
+    /// 每页记录数
+    pub limit: Option<u32>,
+    /// 搜索关键词（用户名或邮箱）
+    pub search: Option<String>,
 }
 
 /// 管理员会话键
@@ -124,6 +157,23 @@ pub async fn admin_page(session: Session) -> impl Responder {
     HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
         .body(crate::utils::templates::ADMIN_PAGE)
+}
+
+/// 显示用户管理页面（需要登录）
+pub async fn admin_users_page(session: Session) -> impl Responder {
+    log::info!("访问用户管理页面");
+    
+    // 检查管理员是否已登录
+    if !is_admin_authenticated(&session) {
+        log::warn!("未登录访问用户管理页面，重定向到登录页面");
+        return HttpResponse::Found()
+            .append_header(("Location", "/admin/login"))
+            .finish();
+    }
+    
+    HttpResponse::Ok()
+        .content_type("text/html; charset=utf-8")
+        .body(crate::utils::templates::ADMIN_USERS_PAGE)
 }
 
 /// 创建提供方（客户端）
@@ -270,6 +320,200 @@ pub async fn update_provider(
         },
         Err(err) => {
             log::warn!("更新提供方失败：{}", err);
+            HttpResponse::BadRequest()
+                .content_type("application/json")
+                .json(serde_json::json!({ "error": err.to_string() }))
+        },
+    }
+}
+
+/// 获取用户列表
+pub async fn get_users(
+    query: web::Query<UserListParams>,
+    db: web::Data<PgPool>,
+    session: Session,
+) -> impl Responder {
+    // 验证管理员是否已登录
+    if !is_admin_authenticated(&session) {
+        log::warn!("未登录尝试获取用户列表");
+        return HttpResponse::Unauthorized()
+            .content_type("application/json")
+            .json(serde_json::json!({ "error": "未登录或会话已过期，请重新登录" }));
+    }
+    
+    // 处理分页参数
+    let page = query.page.unwrap_or(1);
+    let limit = query.limit.unwrap_or(10);
+    let offset = (page - 1) * limit;
+    
+    // 执行查询
+    let result = user_service::admin_get_user_list(
+        offset as i64, 
+        limit as i64, 
+        query.search.as_deref(),
+        &db
+    ).await;
+    
+    match result {
+        Ok((users, total)) => {
+            log::info!("获取用户列表，共{}个", users.len());
+            // 返回JSON响应
+            HttpResponse::Ok()
+                .content_type("application/json")
+                .json(serde_json::json!({
+                    "users": users,
+                    "total": total,
+                    "page": page,
+                    "limit": limit
+                }))
+        },
+        Err(err) => {
+            log::error!("获取用户列表失败：{}", err);
+            HttpResponse::InternalServerError()
+                .content_type("application/json")
+                .json(serde_json::json!({ "error": err.to_string() }))
+        },
+    }
+}
+
+/// 创建用户
+pub async fn create_user(
+    data: web::Json<CreateUserRequest>,
+    db: web::Data<PgPool>,
+    session: Session,
+) -> impl Responder {
+    // 验证管理员是否已登录
+    if !is_admin_authenticated(&session) {
+        log::warn!("未登录尝试创建用户");
+        return HttpResponse::Unauthorized()
+            .content_type("application/json")
+            .json(serde_json::json!({ "error": "未登录或会话已过期，请重新登录" }));
+    }
+    
+    // 创建用户对象
+    let user_create = UserCreate {
+        username: data.username.clone(),
+        email: data.email.clone(),
+        password: data.password.clone(),
+    };
+    
+    // 创建用户
+    match user_service::create_user(&user_create, &db).await {
+        Ok(user) => {
+            log::info!("用户创建成功，ID: {}", user.id);
+            let user_response = crate::models::UserResponse::from(user);
+            HttpResponse::Created()
+                .content_type("application/json")
+                .json(user_response)
+        },
+        Err(err) => {
+            log::error!("创建用户失败：{}", err);
+            HttpResponse::BadRequest()
+                .content_type("application/json")
+                .json(serde_json::json!({ "error": err.to_string() }))
+        },
+    }
+}
+
+/// 更新用户
+pub async fn update_user(
+    path: web::Path<Uuid>,
+    data: web::Json<UpdateUserRequest>,
+    db: web::Data<PgPool>,
+    session: Session,
+) -> impl Responder {
+    // 验证管理员是否已登录
+    if !is_admin_authenticated(&session) {
+        log::warn!("未登录尝试更新用户");
+        return HttpResponse::Unauthorized()
+            .content_type("application/json")
+            .json(serde_json::json!({ "error": "未登录或会话已过期，请重新登录" }));
+    }
+    
+    let user_id = path.into_inner();
+    
+    // 更新用户
+    match user_service::update_user(
+        user_id,
+        data.username.clone(),
+        data.email.clone(),
+        data.avatar_url.clone(),
+        &db,
+    ).await {
+        Ok(user) => {
+            log::info!("用户更新成功，ID: {}", user_id);
+            HttpResponse::Ok()
+                .content_type("application/json")
+                .json(user)
+        },
+        Err(err) => {
+            log::error!("更新用户失败：{}", err);
+            HttpResponse::BadRequest()
+                .content_type("application/json")
+                .json(serde_json::json!({ "error": err.to_string() }))
+        },
+    }
+}
+
+/// 删除用户
+pub async fn delete_user(
+    path: web::Path<Uuid>,
+    db: web::Data<PgPool>,
+    session: Session,
+) -> impl Responder {
+    // 验证管理员是否已登录
+    if !is_admin_authenticated(&session) {
+        log::warn!("未登录尝试删除用户");
+        return HttpResponse::Unauthorized()
+            .content_type("application/json")
+            .json(serde_json::json!({ "error": "未登录或会话已过期，请重新登录" }));
+    }
+    
+    let user_id = path.into_inner();
+    
+    // 删除用户
+    match user_service::delete_user(user_id, &db).await {
+        Ok(_) => {
+            log::info!("用户删除成功，ID: {}", user_id);
+            HttpResponse::Ok()
+                .content_type("application/json")
+                .json(serde_json::json!({ "success": true }))
+        },
+        Err(err) => {
+            log::error!("删除用户失败：{}", err);
+            HttpResponse::BadRequest()
+                .content_type("application/json")
+                .json(serde_json::json!({ "error": err.to_string() }))
+        },
+    }
+}
+
+/// 验证用户邮箱
+pub async fn verify_user_email(
+    path: web::Path<Uuid>,
+    db: web::Data<PgPool>,
+    session: Session,
+) -> impl Responder {
+    // 验证管理员是否已登录
+    if !is_admin_authenticated(&session) {
+        log::warn!("未登录尝试验证用户邮箱");
+        return HttpResponse::Unauthorized()
+            .content_type("application/json")
+            .json(serde_json::json!({ "error": "未登录或会话已过期，请重新登录" }));
+    }
+    
+    let user_id = path.into_inner();
+    
+    // 更新邮箱验证状态
+    match user_service::update_user_email_verified(user_id, true, &db).await {
+        Ok(user) => {
+            log::info!("用户邮箱验证成功，ID: {}", user_id);
+            HttpResponse::Ok()
+                .content_type("application/json")
+                .json(user)
+        },
+        Err(err) => {
+            log::error!("验证用户邮箱失败：{}", err);
             HttpResponse::BadRequest()
                 .content_type("application/json")
                 .json(serde_json::json!({ "error": err.to_string() }))

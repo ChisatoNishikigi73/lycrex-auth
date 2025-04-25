@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户管理</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        .container {
+            max-width: 900px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: white;
+        }
+        input[type="text"],
+        input[type="email"],
+        input[type="password"] {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        input[type="text"]:focus,
+        input[type="email"]:focus,
+        input[type="password"]:focus {
+            background-color: rgba(255, 255, 255, 0.15);
+            outline: none;
+        }
+        label {
+            color: rgba(255, 255, 255, 0.9);
+        }
+        button {
+            width: auto;
+            background-color: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .delete-btn {
+            background-color: #e74c3c;
+        }
+        .delete-btn:hover {
+            background-color: #c0392b;
+        }
+        .edit-btn {
+            background-color: #f39c12;
+        }
+        .edit-btn:hover {
+            background-color: #d35400;
+        }
+        .verify-btn {
+            background-color: #2ecc71;
+        }
+        .verify-btn:hover {
+            background-color: #27ae60;
+        }
+        .logout-btn {
+            background-color: rgba(149, 165, 166, 0.4);
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+        .logout-btn:hover {
+            background-color: rgba(149, 165, 166, 0.6);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+        }
+        .modal-content {
+            background-color: #111;
+            color: white;
+            margin: 10% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 60%;
+            max-width: 500px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 10px;
+        }
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover {
+            color: white;
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+        }
+        table {
+            background: rgba(255, 255, 255, 0.05);
+            width: 100%;
+        }
+        th {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            color: rgba(255, 255, 255, 0.7);
+        }
+        .tab.active {
+            color: white;
+            border-bottom: 2px solid #3498db;
+        }
+        .search-bar {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .search-bar input {
+            flex: 1;
+            margin-right: 10px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .badge-success {
+            background-color: #2ecc71;
+        }
+        .badge-warning {
+            background-color: #f39c12;
+        }
+        .pagination {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+            gap: 10px;
+        }
+        .pagination button {
+            padding: 5px 10px;
+            margin: 0;
+        }
+        .pagination button.active {
+            background-color: #3498db;
+        }
+        .pagination button:disabled {
+            background-color: rgba(149, 165, 166, 0.4);
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>用户管理界面</h1>
+            <div>
+                <a href="/admin"><button class="edit-btn">提供方管理</button></a>
+                <a href="/admin/logout"><button class="logout-btn">退出登录</button></a>
+            </div>
+        </div>
+        
+        <div class="tabs">
+            <div class="tab active" id="user-list-tab">用户列表</div>
+            <div class="tab" id="create-user-tab">创建用户</div>
+        </div>
+        
+        <div id="user-list-section">
+            <div class="search-bar">
+                <input type="text" id="search-input" placeholder="搜索用户名或邮箱...">
+                <button id="search-btn">搜索</button>
+            </div>
+            
+            <div class="error" id="error-message" style="display: none;"></div>
+            <div class="success" id="success-message" style="display: none;"></div>
+            
+            <table id="users-table">
+                <thead>
+                    <tr>
+                        <th>用户名</th>
+                        <th>邮箱</th>
+                        <th>邮箱验证</th>
+                        <th>创建时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="users-list">
+                    <!-- 用户列表将动态加载 -->
+                </tbody>
+            </table>
+            
+            <div class="pagination" id="pagination">
+                <!-- 分页控件将动态生成 -->
+            </div>
+        </div>
+        
+        <div id="create-user-section" style="display: none;">
+            <form id="user-form">
+                <div class="error" id="create-error-message" style="display: none;"></div>
+                <div class="success" id="create-success-message" style="display: none;"></div>
+                
+                <div>
+                    <label for="username">用户名</label>
+                    <input type="text" id="username" name="username" required placeholder="用户名">
+                </div>
+                
+                <div>
+                    <label for="email">邮箱</label>
+                    <input type="email" id="email" name="email" required placeholder="邮箱地址">
+                </div>
+                
+                <div>
+                    <label for="password">密码</label>
+                    <input type="password" id="password" name="password" required placeholder="密码">
+                </div>
+                
+                <button type="submit">创建用户</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- 编辑用户的模态框 -->
+    <div id="edit-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>编辑用户</h2>
+                <span class="close">&times;</span>
+            </div>
+            <form id="edit-form">
+                <input type="hidden" id="edit-id">
+                
+                <div>
+                    <label for="edit-username">用户名</label>
+                    <input type="text" id="edit-username" name="edit-username" required placeholder="用户名">
+                </div>
+                
+                <div>
+                    <label for="edit-email">邮箱</label>
+                    <input type="email" id="edit-email" name="edit-email" required placeholder="邮箱地址">
+                </div>
+                
+                <div>
+                    <label for="edit-avatar-url">头像URL</label>
+                    <input type="text" id="edit-avatar-url" name="edit-avatar-url" placeholder="头像URL">
+                </div>
+                
+                <button type="submit">保存修改</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 全局变量
+            let currentPage = 1;
+            let pageSize = 10;
+            let totalUsers = 0;
+            let searchQuery = '';
+            
+            // 切换标签页
+            const userListTab = document.getElementById('user-list-tab');
+            const createUserTab = document.getElementById('create-user-tab');
+            const userListSection = document.getElementById('user-list-section');
+            const createUserSection = document.getElementById('create-user-section');
+            
+            userListTab.addEventListener('click', function() {
+                userListTab.classList.add('active');
+                createUserTab.classList.remove('active');
+                userListSection.style.display = 'block';
+                createUserSection.style.display = 'none';
+                loadUsers();
+            });
+            
+            createUserTab.addEventListener('click', function() {
+                createUserTab.classList.add('active');
+                userListTab.classList.remove('active');
+                createUserSection.style.display = 'block';
+                userListSection.style.display = 'none';
+            });
+            
+            // 处理搜索
+            const searchBtn = document.getElementById('search-btn');
+            const searchInput = document.getElementById('search-input');
+            
+            searchBtn.addEventListener('click', function() {
+                searchQuery = searchInput.value.trim();
+                currentPage = 1;
+                loadUsers();
+            });
+            
+            searchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    searchQuery = searchInput.value.trim();
+                    currentPage = 1;
+                    loadUsers();
+                }
+            });
+            
+            // 加载用户列表
+            function loadUsers() {
+                showLoadingMessage('加载用户中...');
+                
+                let url = `/admin/api/users?page=${currentPage}&limit=${pageSize}`;
+                if (searchQuery) {
+                    url += `&search=${encodeURIComponent(searchQuery)}`;
+                }
+                
+                fetch(url)
+                    .then(response => {
+                        if (!response.ok) {
+                            if (response.status === 401) {
+                                window.location.href = '/admin/login';
+                                throw new Error('会话已过期，请重新登录');
+                            }
+                            return response.json().then(data => {
+                                throw new Error(data.error || `HTTP错误: ${response.status}`);
+                            });
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.error) {
+                            showError(data.error);
+                        } else {
+                            renderUsers(data.users);
+                            totalUsers = data.total || data.users.length;
+                            renderPagination();
+                            hideMessages();
+                        }
+                    })
+                    .catch(error => {
+                        showError('加载用户失败: ' + error.message);
+                    });
+            }
+            
+            // 渲染用户列表
+            function renderUsers(users) {
+                const usersList = document.getElementById('users-list');
+                usersList.innerHTML = '';
+                
+                if (users.length === 0) {
+                    usersList.innerHTML = `<tr><td colspan="5" style="text-align: center;">没有找到用户</td></tr>`;
+                    return;
+                }
+                
+                users.forEach(user => {
+                    const row = document.createElement('tr');
+                    
+                    // 格式化时间
+                    let formattedDate = "未知";
+                    if (user.created_at) {
+                        const createdDate = new Date(user.created_at);
+                        if (!isNaN(createdDate.getTime())) {
+                            formattedDate = createdDate.toLocaleString('zh-CN');
+                        }
+                    }
+                    
+                    // 创建邮箱验证状态标识
+                    const verifiedBadge = user.email_verified 
+                        ? `<span class="badge badge-success">已验证</span>` 
+                        : `<span class="badge badge-warning">未验证</span>`;
+                    
+                    row.innerHTML = `
+                        <td>${user.username}</td>
+                        <td>${user.email}</td>
+                        <td>${verifiedBadge}</td>
+                        <td>${formattedDate}</td>
+                        <td class="actions">
+                            <button class="edit-btn" data-id="${user.id}" data-username="${user.username}" data-email="${user.email}" data-avatar="${user.avatar_url || ''}">编辑</button>
+                            ${!user.email_verified ? `<button class="verify-btn" data-id="${user.id}">验证邮箱</button>` : ''}
+                            <button class="delete-btn" data-id="${user.id}">删除</button>
+                        </td>
+                    `;
+                    
+                    usersList.appendChild(row);
+                });
+                
+                // 添加编辑按钮事件监听
+                document.querySelectorAll('.edit-btn').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const userId = this.getAttribute('data-id');
+                        const username = this.getAttribute('data-username');
+                        const email = this.getAttribute('data-email');
+                        const avatar = this.getAttribute('data-avatar');
+                        
+                        // 填充编辑表单
+                        document.getElementById('edit-id').value = userId;
+                        document.getElementById('edit-username').value = username;
+                        document.getElementById('edit-email').value = email;
+                        document.getElementById('edit-avatar-url').value = avatar;
+                        
+                        // 显示模态框
+                        document.getElementById('edit-modal').style.display = 'block';
+                    });
+                });
+                
+                // 添加删除按钮事件监听
+                document.querySelectorAll('.delete-btn').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const userId = this.getAttribute('data-id');
+                        if (confirm('确定要删除这个用户吗？此操作无法撤销！')) {
+                            deleteUser(userId);
+                        }
+                    });
+                });
+                
+                // 添加验证邮箱按钮事件监听
+                document.querySelectorAll('.verify-btn').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const userId = this.getAttribute('data-id');
+                        verifyUserEmail(userId);
+                    });
+                });
+            }
+            
+            // 渲染分页
+            function renderPagination() {
+                const pagination = document.getElementById('pagination');
+                pagination.innerHTML = '';
+                
+                const totalPages = Math.ceil(totalUsers / pageSize);
+                
+                // 上一页按钮
+                const prevButton = document.createElement('button');
+                prevButton.innerText = '上一页';
+                prevButton.disabled = currentPage === 1;
+                prevButton.addEventListener('click', () => {
+                    if (currentPage > 1) {
+                        currentPage--;
+                        loadUsers();
+                    }
+                });
+                
+                // 下一页按钮
+                const nextButton = document.createElement('button');
+                nextButton.innerText = '下一页';
+                nextButton.disabled = currentPage >= totalPages;
+                nextButton.addEventListener('click', () => {
+                    if (currentPage < totalPages) {
+                        currentPage++;
+                        loadUsers();
+                    }
+                });
+                
+                pagination.appendChild(prevButton);
+                
+                // 页码按钮
+                let startPage = Math.max(1, currentPage - 2);
+                let endPage = Math.min(totalPages, currentPage + 2);
+                
+                for (let i = startPage; i <= endPage; i++) {
+                    const pageButton = document.createElement('button');
+                    pageButton.innerText = i;
+                    if (i === currentPage) {
+                        pageButton.classList.add('active');
+                    }
+                    pageButton.addEventListener('click', () => {
+                        currentPage = i;
+                        loadUsers();
+                    });
+                    pagination.appendChild(pageButton);
+                }
+                
+                pagination.appendChild(nextButton);
+            }
+            
+            // 删除用户
+            function deleteUser(userId) {
+                fetch(`/admin/api/users/${userId}`, {
+                    method: 'DELETE'
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            window.location.href = '/admin/login';
+                            throw new Error('会话已过期，请重新登录');
+                        }
+                        return response.json().then(data => {
+                            throw new Error(data.error || `HTTP错误: ${response.status}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.error) {
+                        showError(data.error);
+                    } else {
+                        showSuccess('用户删除成功！');
+                        loadUsers();
+                    }
+                })
+                .catch(error => {
+                    showError('删除用户失败: ' + error.message);
+                });
+            }
+            
+            // 验证用户邮箱
+            function verifyUserEmail(userId) {
+                fetch(`/admin/api/users/${userId}/verify-email`, {
+                    method: 'POST'
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            window.location.href = '/admin/login';
+                            throw new Error('会话已过期，请重新登录');
+                        }
+                        return response.json().then(data => {
+                            throw new Error(data.error || `HTTP错误: ${response.status}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.error) {
+                        showError(data.error);
+                    } else {
+                        showSuccess('用户邮箱验证成功！');
+                        loadUsers();
+                    }
+                })
+                .catch(error => {
+                    showError('验证用户邮箱失败: ' + error.message);
+                });
+            }
+            
+            // 创建用户表单提交处理
+            const userForm = document.getElementById('user-form');
+            userForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const username = document.getElementById('username').value;
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                
+                // 发送到服务器
+                fetch('/admin/api/users', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username,
+                        email,
+                        password
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            window.location.href = '/admin/login';
+                            throw new Error('会话已过期，请重新登录');
+                        }
+                        return response.json().then(data => {
+                            throw new Error(data.error || `HTTP错误: ${response.status}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.error) {
+                        showCreateError(data.error);
+                    } else {
+                        showCreateSuccess('用户创建成功！');
+                        userForm.reset();
+                        
+                        // 切换到用户列表标签页
+                        setTimeout(() => {
+                            userListTab.click();
+                        }, 1500);
+                    }
+                })
+                .catch(error => {
+                    showCreateError('创建用户失败: ' + error.message);
+                });
+            });
+            
+            // 编辑用户表单提交处理
+            const editForm = document.getElementById('edit-form');
+            editForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const userId = document.getElementById('edit-id').value;
+                const username = document.getElementById('edit-username').value;
+                const email = document.getElementById('edit-email').value;
+                const avatarUrl = document.getElementById('edit-avatar-url').value;
+                
+                // 发送到服务器
+                fetch(`/admin/api/users/${userId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username,
+                        email,
+                        avatar_url: avatarUrl || null
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            window.location.href = '/admin/login';
+                            throw new Error('会话已过期，请重新登录');
+                        }
+                        return response.json().then(data => {
+                            throw new Error(data.error || `HTTP错误: ${response.status}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.error) {
+                        showError(data.error);
+                    } else {
+                        document.getElementById('edit-modal').style.display = 'none';
+                        showSuccess('用户更新成功！');
+                        loadUsers();
+                    }
+                })
+                .catch(error => {
+                    showError('更新用户失败: ' + error.message);
+                });
+            });
+            
+            // 模态框关闭按钮
+            document.querySelector('.close').addEventListener('click', function() {
+                document.getElementById('edit-modal').style.display = 'none';
+            });
+            
+            // 点击模态框外部关闭
+            window.addEventListener('click', function(event) {
+                const modal = document.getElementById('edit-modal');
+                if (event.target == modal) {
+                    modal.style.display = 'none';
+                }
+            });
+            
+            // 显示错误消息
+            function showError(message) {
+                const errorMessage = document.getElementById('error-message');
+                errorMessage.textContent = message;
+                errorMessage.style.display = 'block';
+                
+                // 5秒后自动隐藏
+                setTimeout(() => {
+                    errorMessage.style.display = 'none';
+                }, 5000);
+            }
+            
+            // 显示成功消息
+            function showSuccess(message) {
+                const successMessage = document.getElementById('success-message');
+                successMessage.textContent = message;
+                successMessage.style.display = 'block';
+                
+                // 3秒后自动隐藏
+                setTimeout(() => {
+                    successMessage.style.display = 'none';
+                }, 3000);
+            }
+            
+            // 显示创建用户错误消息
+            function showCreateError(message) {
+                const errorMessage = document.getElementById('create-error-message');
+                errorMessage.textContent = message;
+                errorMessage.style.display = 'block';
+                
+                // 5秒后自动隐藏
+                setTimeout(() => {
+                    errorMessage.style.display = 'none';
+                }, 5000);
+            }
+            
+            // 显示创建用户成功消息
+            function showCreateSuccess(message) {
+                const successMessage = document.getElementById('create-success-message');
+                successMessage.textContent = message;
+                successMessage.style.display = 'block';
+                
+                // 3秒后自动隐藏
+                setTimeout(() => {
+                    successMessage.style.display = 'none';
+                }, 3000);
+            }
+            
+            // 显示加载消息
+            function showLoadingMessage(message) {
+                const successMessage = document.getElementById('success-message');
+                successMessage.textContent = message;
+                successMessage.style.display = 'block';
+            }
+            
+            // 隐藏所有消息
+            function hideMessages() {
+                document.getElementById('error-message').style.display = 'none';
+                document.getElementById('success-message').style.display = 'none';
+            }
+            
+            // 初始加载
+            loadUsers();
+        });
+    </script>
+</body>
+</html> 
