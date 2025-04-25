@@ -14,6 +14,7 @@ use actix_session::{SessionMiddleware, storage::CookieSessionStore};
 use actix_web::cookie::Key;
 use env_logger::Env;
 use log::{info, LevelFilter};
+use actix_files as fs;
 
 use crate::config::Config;
 use crate::routes::configure_routes;
@@ -137,7 +138,7 @@ async fn main() -> std::io::Result<()> {
                 .cookie_name("lycrex_session".to_string())
                 .cookie_path("/".to_string())
                 .cookie_same_site(actix_web::cookie::SameSite::Lax)
-                .cookie_domain(None)
+                .cookie_domain(Some("127.0.0.1".to_string()))
                 .session_lifecycle(
                     actix_session::config::PersistentSession::default()
                         .session_ttl(actix_web::cookie::time::Duration::hours(24))
@@ -145,6 +146,8 @@ async fn main() -> std::io::Result<()> {
                 .build()
             )
             .app_data(web::Data::new(db_pool.clone()))
+            // 添加静态文件服务
+            .service(fs::Files::new("/static", "./src/static").show_files_listing())
             .configure(configure_routes)
     })
     .bind(format!("{}:{}", config.server.host, config.server.port))?

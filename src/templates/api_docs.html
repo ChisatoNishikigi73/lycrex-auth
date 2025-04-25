@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Lycrex OAuth - API文档</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1>Lycrex OAuth API 文档</h1>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>概述</h2>
+        <p>Lycrex OAuth 服务提供标准的 OAuth 2.0 授权服务，允许第三方应用安全地获取用户授权而无需处理用户的凭据。本文档介绍如何集成和使用 Lycrex OAuth API。</p>
+
+        <div class="note">
+            <p><strong>注意：</strong> 使用本服务前，需要向 Lycrex 平台注册您的应用并获取 <code>client_id</code> 和 <code>client_secret</code>。</p>
+        </div>
+
+        <h2>授权流程</h2>
+        <p>Lycrex OAuth 实现了标准的 OAuth 2.0 授权码流程（Authorization Code Flow）：</p>
+        <ol>
+            <li>重定向用户到 Lycrex 授权页面</li>
+            <li>用户登录并授予权限</li>
+            <li>用户被重定向回您的应用，带有授权码</li>
+            <li>您的应用使用授权码交换访问令牌</li>
+            <li>使用访问令牌访问受保护的资源</li>
+        </ol>
+
+        <h2>API 端点</h2>
+
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <span class="url">/login</span>
+            <p>用户登录端点，必须包含必要的OAuth参数。</p>
+            
+            <h3>请求参数</h3>
+            <table>
+                <tr>
+                    <th>参数名</th>
+                    <th>类型</th>
+                    <th>必填</th>
+                    <th>描述</th>
+                </tr>
+                <tr>
+                    <td>client_id</td>
+                    <td>string</td>
+                    <td>是</td>
+                    <td>您应用的客户端ID</td>
+                </tr>
+                <tr>
+                    <td>redirect_uri</td>
+                    <td>string</td>
+                    <td>是</td>
+                    <td>授权完成后的回调URL</td>
+                </tr>
+                <tr>
+                    <td>response_type</td>
+                    <td>string</td>
+                    <td>是</td>
+                    <td>必须为 "code"</td>
+                </tr>
+                <tr>
+                    <td>scope</td>
+                    <td>string</td>
+                    <td>否</td>
+                    <td>请求的权限范围，以空格分隔</td>
+                </tr>
+                <tr>
+                    <td>state</td>
+                    <td>string</td>
+                    <td>推荐</td>
+                    <td>随机字符串，用于防止CSRF攻击</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="endpoint">
+            <span class="method post">POST</span>
+            <span class="url">/api/oauth/authorize</span>
+            <p>授权端点，登录后会自动调用此接口。</p>
+            
+            <h3>请求参数</h3>
+            <p>与登录页面相同的参数。</p>
+            
+            <h3>响应</h3>
+            <p>重定向到您提供的 <code>redirect_uri</code>，并附加以下参数：</p>
+            <ul>
+                <li><code>code</code>: 授权码</li>
+                <li><code>state</code>: 如果请求中提供了state，则返回相同的值</li>
+            </ul>
+        </div>
+
+        <div class="endpoint">
+            <span class="method post">POST</span>
+            <span class="url">/api/oauth/token</span>
+            <p>令牌端点，用于交换授权码获取访问令牌。</p>
+            
+            <h3>请求参数</h3>
+            <table>
+                <tr>
+                    <th>参数名</th>
+                    <th>类型</th>
+                    <th>必填</th>
+                    <th>描述</th>
+                </tr>
+                <tr>
+                    <td>grant_type</td>
+                    <td>string</td>
+                    <td>是</td>
+                    <td>必须为 "authorization_code"</td>
+                </tr>
+                <tr>
+                    <td>code</td>
+                    <td>string</td>
+                    <td>是</td>
+                    <td>从授权端点获取的授权码</td>
+                </tr>
+                <tr>
+                    <td>redirect_uri</td>
+                    <td>string</td>
+                    <td>是</td>
+                    <td>必须与授权请求中的相同</td>
+                </tr>
+                <tr>
+                    <td>client_id</td>
+                    <td>string</td>
+                    <td>是</td>
+                    <td>您应用的客户端ID</td>
+                </tr>
+                <tr>
+                    <td>client_secret</td>
+                    <td>string</td>
+                    <td>是</td>
+                    <td>您应用的客户端密钥</td>
+                </tr>
+            </table>
+            
+            <h3>响应</h3>
+            <pre>{
+  "access_token": "eyJhbGc...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "eyJhbGc...",
+  "scope": "requested scopes"
+}</pre>
+        </div>
+
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <span class="url">/api/oauth/userinfo</span>
+            <p>用户信息端点，获取当前授权用户的基本信息。</p>
+            
+            <h3>请求头</h3>
+            <pre>Authorization: Bearer {access_token}</pre>
+            
+            <h3>响应</h3>
+            <pre>{
+  "id": "user-uuid",
+  "username": "用户名",
+  "email": "user@example.com",
+  "created_at": "2025-01-01T00:00:00Z"
+}</pre>
+        </div>
+
+        <div class="endpoint">
+            <span class="method post">POST</span>
+            <span class="url">/api/auth/logout</span>
+            <p>登出端点，用于撤销令牌并结束用户会话。</p>
+            
+            <h3>请求头</h3>
+            <pre>Authorization: Bearer {access_token}</pre>
+            
+            <h3>响应</h3>
+            <pre>{
+  "success": true,
+  "message": "已成功退出登录并吊销令牌"
+}</pre>
+        </div>
+
+        <h2>示例代码</h2>
+        
+        <h3>1. 重定向用户到授权页面</h3>
+        <pre>// JavaScript 示例
+const authUrl = 'https://auth.lycrex.com/login';
+const clientId = 'YOUR_CLIENT_ID';
+const redirectUri = 'https://your-app.com/callback';
+const responseType = 'code';
+const scope = 'profile email';
+const state = generateRandomString(); // 推荐使用加密安全的随机字符串
+
+// 存储state用于后续验证
+localStorage.setItem('oauth_state', state);
+
+// 构建完整的授权URL
+const url = `${authUrl}?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=${responseType}&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(state)}`;
+
+// 重定向用户到授权页面
+window.location.href = url;</pre>
+
+        <h3>2. 处理回调并获取访问令牌</h3>
+        <pre>// 回调处理（伪代码）
+// 1. 从URL获取code和state参数
+const urlParams = new URLSearchParams(window.location.search);
+const code = urlParams.get('code');
+const state = urlParams.get('state');
+const savedState = localStorage.getItem('oauth_state');
+
+// 2. 验证state以防止CSRF攻击
+if (state !== savedState) {
+  throw new Error('State验证失败，可能存在CSRF攻击');
+}
+
+// 3. 使用授权码交换访问令牌
+const tokenResponse = await fetch('https://auth.lycrex.com/api/oauth/token', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    grant_type: 'authorization_code',
+    code: code,
+    redirect_uri: 'https://your-app.com/callback',
+    client_id: 'YOUR_CLIENT_ID',
+    client_secret: 'YOUR_CLIENT_SECRET'
+  })
+});
+
+const tokenData = await tokenResponse.json();
+const accessToken = tokenData.access_token;
+
+// 4. 使用访问令牌获取用户信息
+const userResponse = await fetch('https://auth.lycrex.com/api/oauth/userinfo', {
+  headers: {
+    'Authorization': `Bearer ${accessToken}`
+  }
+});
+
+const userData = await userResponse.json();
+console.log('用户信息:', userData);</pre>
+
+        <div class="warning">
+            <p><strong>安全提示：</strong> 生产环境中，建议使用服务端代码处理令牌交换，避免在客户端暴露 <code>client_secret</code>。</p>
+        </div>
+
+        <h2>最佳实践</h2>
+        <ul>
+            <li>始终验证state参数以防止CSRF攻击</li>
+            <li>所有敏感操作都应在服务器端完成，避免在客户端暴露client_secret</li>
+            <li>使用HTTPS协议保护所有API调用</li>
+            <li>正确处理令牌的续期和刷新</li>
+            <li>令牌使用完毕后应及时调用登出接口吊销</li>
+        </ul>
+
+        <div class="footer">
+            <p>Copyright © 2025 Lycrex. All rights reserved.</p>
+            <p>如有任何问题，请联系 <a href="mailto:support@lycrex.com">support@lycrex.com</a></p>
+        </div>
+    </div>
+</body>
+</html> 

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Lycrex 认证 - 登录</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+
+</head>
+<body>
+    <div class="container">
+        <h1>Lycrex 认证</h1>
+        <div class="status">{}</div>
+        <div id="error" class="error" style="display: none;"></div>
+        <form id="loginForm">
+            <label for="email">电子邮箱</label>
+            <input type="email" id="email" name="email" required>
+            
+            <label for="password">密码</label>
+            <input type="password" id="password" name="password" required>
+            
+            <input type="hidden" name="client_id" value="{}">
+            <input type="hidden" name="redirect_uri" value="{}">
+            <input type="hidden" name="response_type" value="{}">
+            <input type="hidden" name="scope" value="{}">
+            <input type="hidden" name="state" value="{}">
+            
+            <button type="submit">登录</button>
+        </form>
+        <p style="text-align: center; margin-top: 20px;">
+            没有账号？<a href="#" id="registerLink">注册</a>
+        </p>
+    </div>
+    
+    <script>
+        // 设置注册链接
+        function setRegisterLink() {
+            const formElements = document.getElementById('loginForm').elements;
+            let clientId = '';
+            let redirectUri = '';
+            let responseType = '';
+            let scope = '';
+            let state = '';
+            
+            // 安全地获取表单字段值
+            if(formElements.namedItem('client_id')) clientId = formElements.namedItem('client_id').value;
+            if(formElements.namedItem('redirect_uri')) redirectUri = formElements.namedItem('redirect_uri').value;
+            if(formElements.namedItem('response_type')) responseType = formElements.namedItem('response_type').value;
+            if(formElements.namedItem('scope')) scope = formElements.namedItem('scope').value;
+            if(formElements.namedItem('state')) state = formElements.namedItem('state').value;
+            
+            let registerUrl = '/register';
+            // 添加OAuth参数
+            if (clientId) {
+                registerUrl += `?client_id=${encodeURIComponent(clientId)}`;
+                if (redirectUri) registerUrl += `&redirect_uri=${encodeURIComponent(redirectUri)}`;
+                if (responseType) registerUrl += `&response_type=${encodeURIComponent(responseType)}`;
+                if (scope) registerUrl += `&scope=${encodeURIComponent(scope)}`;
+                if (state) registerUrl += `&state=${encodeURIComponent(state)}`;
+            }
+            
+            document.getElementById('registerLink').href = registerUrl;
+        }
+        
+        // 页面加载时设置注册链接
+        window.onload = function() {
+            setRegisterLink();
+        };
+
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                // 发送登录请求
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password }),
+                    credentials: 'include' // 确保包含cookie
+                });
+                
+                if (response.ok) {
+                    // 获取表单中可能存在的隐藏字段值
+                    const formElements = document.getElementById('loginForm').elements;
+                    let clientId = '';
+                    let redirectUri = '';
+                    let responseType = '';
+                    let scope = '';
+                    let state = '';
+                    
+                    // 安全地获取表单字段值
+                    if(formElements.namedItem('client_id')) clientId = formElements.namedItem('client_id').value;
+                    if(formElements.namedItem('redirect_uri')) redirectUri = formElements.namedItem('redirect_uri').value;
+                    if(formElements.namedItem('response_type')) responseType = formElements.namedItem('response_type').value;
+                    if(formElements.namedItem('scope')) scope = formElements.namedItem('scope').value;
+                    if(formElements.namedItem('state')) state = formElements.namedItem('state').value;
+                    
+                    // 使用同步提交表单方式重定向，确保cookie能被正确处理
+                    const form = document.createElement('form');
+                    form.method = 'GET';
+                    form.action = '/api/oauth/authorize';
+                    
+                    // 添加隐藏字段
+                    function addField(name, value) {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = name;
+                        input.value = value;
+                        form.appendChild(input);
+                    }
+                    
+                    addField('client_id', clientId);
+                    addField('redirect_uri', redirectUri);
+                    addField('response_type', responseType);
+                    if (scope) addField('scope', scope);
+                    if (state) addField('state', state);
+                    
+                    // 添加从响应中获取的用户ID
+                    try {
+                        const userData = await response.json();
+                        if (userData && userData.id) {
+                            addField('user_id', userData.id);
+                            console.log('添加用户ID到请求: ', userData.id);
+                        }
+                    } catch(e) {
+                        console.error('无法解析用户数据', e);
+                    }
+                    
+                    // 添加到文档并提交
+                    document.body.appendChild(form);
+                    form.submit();
+                } else {
+                    const error = await response.text();
+                    document.getElementById('error').textContent = `认证失败: ${error}`;
+                    document.getElementById('error').style.display = 'block';
+                }
+            } catch (error) {
+                document.getElementById('error').textContent = `系统错误: ${error.message}`;
+                document.getElementById('error').style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html> 

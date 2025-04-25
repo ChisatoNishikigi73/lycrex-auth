@@ -332,7 +332,10 @@ pub async fn login(
             // 确保删除任何已登出标记
             session.remove("logged_out");
             
-            log::debug!("用户ID已保存到会话中");
+            // 明确指示需要将会话保存
+            session.renew();
+            
+            log::debug!("用户ID已保存到会话中: {}", user.id);
             
             // 输出会话状态检查
             match session.get::<String>("user_id") {

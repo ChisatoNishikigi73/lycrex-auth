@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Lycrex 认证 - 注册</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+
+</head>
+<body>
+    <div class="container">
+        <h1>创建账号</h1>
+        <div id="error" class="error" style="display: none;"></div>
+        <form id="registerForm">
+            <label for="username">用户名</label>
+            <input type="text" id="username" name="username" required>
+            
+            <label for="email">电子邮箱</label>
+            <input type="email" id="email" name="email" required>
+            
+            <label for="password">密码</label>
+            <input type="password" id="password" name="password" required minlength="6">
+            
+            <input type="hidden" id="client_id" name="client_id" value="">
+            <input type="hidden" id="redirect_uri" name="redirect_uri" value="">
+            <input type="hidden" id="response_type" name="response_type" value="">
+            <input type="hidden" id="scope" name="scope" value="">
+            <input type="hidden" id="state" name="state" value="">
+            
+            <button type="submit">注册</button>
+        </form>
+        <p style="text-align: center; margin-top: 20px;">
+            已有账号？<a href="#" id="loginLink">登录</a>
+        </p>
+    </div>
+    
+    <script>
+        // 从URL参数中获取OAuth相关信息
+        function getUrlParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return {
+                client_id: urlParams.get('client_id') || '',
+                redirect_uri: urlParams.get('redirect_uri') || '',
+                response_type: urlParams.get('response_type') || '',
+                scope: urlParams.get('scope') || '',
+                state: urlParams.get('state') || ''
+            };
+        }
+        
+        // 设置表单隐藏字段的值
+        function setFormParams() {
+            const params = getUrlParams();
+            document.getElementById('client_id').value = params.client_id;
+            document.getElementById('redirect_uri').value = params.redirect_uri;
+            document.getElementById('response_type').value = params.response_type;
+            document.getElementById('scope').value = params.scope;
+            document.getElementById('state').value = params.state;
+        }
+        
+        // 设置登录链接
+        function setLoginLink() {
+            const params = getUrlParams();
+            let loginUrl = '/login';
+            
+            // 添加OAuth参数
+            if (params.client_id) {
+                loginUrl += `?client_id=${params.client_id}`;
+                if (params.redirect_uri) loginUrl += `&redirect_uri=${params.redirect_uri}`;
+                if (params.response_type) loginUrl += `&response_type=${params.response_type}`;
+                if (params.scope) loginUrl += `&scope=${params.scope}`;
+                if (params.state) loginUrl += `&state=${params.state}`;
+            }
+            
+            document.getElementById('loginLink').href = loginUrl;
+        }
+        
+        // 页面加载时执行
+        window.onload = function() {
+            setFormParams();
+            setLoginLink();
+        };
+        
+        document.getElementById('registerForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                // 发送注册请求
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, email, password })
+                });
+                
+                if (response.ok) {
+                    // 获取OAuth参数
+                    const params = getUrlParams();
+                    let loginUrl = '/login';
+                    
+                    // 添加OAuth参数
+                    if (params.client_id) {
+                        loginUrl += `?client_id=${params.client_id}`;
+                        if (params.redirect_uri) loginUrl += `&redirect_uri=${params.redirect_uri}`;
+                        if (params.response_type) loginUrl += `&response_type=${params.response_type}`;
+                        if (params.scope) loginUrl += `&scope=${params.scope}`;
+                        if (params.state) loginUrl += `&state=${params.state}`;
+                    }
+                    
+                    // 注册成功，重定向到登录页面并保留OAuth参数
+                    window.location.href = loginUrl;
+                } else {
+                    const error = await response.text();
+                    document.getElementById('error').textContent = `注册失败: ${error}`;
+                    document.getElementById('error').style.display = 'block';
+                }
+            } catch (error) {
+                document.getElementById('error').textContent = `请求错误: ${error.message}`;
+                document.getElementById('error').style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html> 
