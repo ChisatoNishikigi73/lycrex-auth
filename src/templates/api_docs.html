@@ -2,6 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Lycrex OAuth - API文档</title>
     <link rel="stylesheet" href="/static/css/main.css">
 
@@ -39,7 +40,7 @@
             <p>用户登录端点，必须包含必要的OAuth参数。</p>
             
             <h3>请求参数</h3>
-            <table>
+            <table class="responsive">
                 <tr>
                     <th>参数名</th>
                     <th>类型</th>
@@ -47,34 +48,34 @@
                     <th>描述</th>
                 </tr>
                 <tr>
-                    <td>client_id</td>
-                    <td>string</td>
-                    <td>是</td>
-                    <td>您应用的客户端ID</td>
+                    <td data-label="参数名">client_id</td>
+                    <td data-label="类型">string</td>
+                    <td data-label="必填">是</td>
+                    <td data-label="描述">您应用的客户端ID</td>
                 </tr>
                 <tr>
-                    <td>redirect_uri</td>
-                    <td>string</td>
-                    <td>是</td>
-                    <td>授权完成后的回调URL</td>
+                    <td data-label="参数名">redirect_uri</td>
+                    <td data-label="类型">string</td>
+                    <td data-label="必填">是</td>
+                    <td data-label="描述">授权完成后的回调URL</td>
                 </tr>
                 <tr>
-                    <td>response_type</td>
-                    <td>string</td>
-                    <td>是</td>
-                    <td>必须为 "code"</td>
+                    <td data-label="参数名">response_type</td>
+                    <td data-label="类型">string</td>
+                    <td data-label="必填">是</td>
+                    <td data-label="描述">必须为 "code"</td>
                 </tr>
                 <tr>
-                    <td>scope</td>
-                    <td>string</td>
-                    <td>否</td>
-                    <td>请求的权限范围，以空格分隔</td>
+                    <td data-label="参数名">scope</td>
+                    <td data-label="类型">string</td>
+                    <td data-label="必填">否</td>
+                    <td data-label="描述">请求的权限范围，以空格分隔</td>
                 </tr>
                 <tr>
-                    <td>state</td>
-                    <td>string</td>
-                    <td>推荐</td>
-                    <td>随机字符串，用于防止CSRF攻击</td>
+                    <td data-label="参数名">state</td>
+                    <td data-label="类型">string</td>
+                    <td data-label="必填">推荐</td>
+                    <td data-label="描述">随机字符串，用于防止CSRF攻击</td>
                 </tr>
             </table>
         </div>
@@ -101,7 +102,7 @@
             <p>令牌端点，用于交换授权码获取访问令牌。</p>
             
             <h3>请求参数</h3>
-            <table>
+            <table class="responsive">
                 <tr>
                     <th>参数名</th>
                     <th>类型</th>
@@ -109,34 +110,34 @@
                     <th>描述</th>
                 </tr>
                 <tr>
-                    <td>grant_type</td>
-                    <td>string</td>
-                    <td>是</td>
-                    <td>必须为 "authorization_code"</td>
+                    <td data-label="参数名">grant_type</td>
+                    <td data-label="类型">string</td>
+                    <td data-label="必填">是</td>
+                    <td data-label="描述">必须为 "authorization_code"</td>
                 </tr>
                 <tr>
-                    <td>code</td>
-                    <td>string</td>
-                    <td>是</td>
-                    <td>从授权端点获取的授权码</td>
+                    <td data-label="参数名">code</td>
+                    <td data-label="类型">string</td>
+                    <td data-label="必填">是</td>
+                    <td data-label="描述">从授权端点获取的授权码</td>
                 </tr>
                 <tr>
-                    <td>redirect_uri</td>
-                    <td>string</td>
-                    <td>是</td>
-                    <td>必须与授权请求中的相同</td>
+                    <td data-label="参数名">redirect_uri</td>
+                    <td data-label="类型">string</td>
+                    <td data-label="必填">是</td>
+                    <td data-label="描述">必须与授权请求中的相同</td>
                 </tr>
                 <tr>
-                    <td>client_id</td>
-                    <td>string</td>
-                    <td>是</td>
-                    <td>您应用的客户端ID</td>
+                    <td data-label="参数名">client_id</td>
+                    <td data-label="类型">string</td>
+                    <td data-label="必填">是</td>
+                    <td data-label="描述">您应用的客户端ID</td>
                 </tr>
                 <tr>
-                    <td>client_secret</td>
-                    <td>string</td>
-                    <td>是</td>
-                    <td>您应用的客户端密钥</td>
+                    <td data-label="参数名">client_secret</td>
+                    <td data-label="类型">string</td>
+                    <td data-label="必填">是</td>
+                    <td data-label="描述">您应用的客户端密钥</td>
                 </tr>
             </table>
             

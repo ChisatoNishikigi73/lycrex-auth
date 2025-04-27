@@ -15,14 +15,17 @@ pub static WARNING_PAGE: &str = include_str!("../templates/warning.html");
 /// API文档页面HTML模板
 pub static API_DOCS_PAGE: &str = include_str!("../templates/api_docs.html");
 
+
+/// ---管理员---
+
 /// 管理员页面HTML模板
-pub static ADMIN_PAGE: &str = include_str!("../templates/admin.html");
+pub static ADMIN_PAGE: &str = include_str!("../templates/admin/admin.html");
 
 /// 管理员登录页面HTML模板
-pub static ADMIN_LOGIN_PAGE: &str = include_str!("../templates/admin_login.html");
+pub static ADMIN_LOGIN_PAGE: &str = include_str!("../templates/admin/admin_login.html");
 
 /// 管理员用户管理页面HTML模板
-pub static ADMIN_USERS_PAGE: &str = include_str!("../templates/admin_users.html");
+pub static ADMIN_USERS_PAGE: &str = include_str!("../templates/admin/admin_users.html");
 
 /// 格式化模板字符串，使用给定参数替换{}占位符
 pub fn format_template(template: &str, args: &[&dyn fmt::Display]) -> String {

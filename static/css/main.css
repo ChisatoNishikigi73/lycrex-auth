@@ -1,3 +1,7 @@
+* {
+    box-sizing: border-box;
+}
+
 @font-face {
     font-family: 'JetBrains Mono';
     src: url('../fonts/JetBrainsMono-ExtraLight.woff2') format('woff2');
@@ -20,6 +24,8 @@ body {
     background-color: black;
     color: white;
     line-height: 1.6;
+    font-size: 16px;
+    -webkit-text-size-adjust: 100%;
 }
 
 /* 容器样式 */
@@ -27,6 +33,7 @@ body {
     max-width: 1000px;
     margin: 0 auto;
     padding: 20px;
+    width: 100%;
 }
 
 /* 标题样式 */
@@ -89,6 +96,8 @@ pre {
     overflow-x: auto;
     line-height: 1.4;
     margin: 20px 0;
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 
 /* 表格样式 */
@@ -97,12 +106,14 @@ table {
     border-collapse: collapse;
     margin: 20px 0;
     background: rgba(255, 255, 255, 0.05);
+    box-sizing: border-box;
 }
 
 table th, table td {
     padding: 10px;
     text-align: left;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    word-break: break-word;
 }
 
 table th {
@@ -166,6 +177,7 @@ table th {
     padding: 20px;
     border-radius: 5px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
 }
 
 .method {
@@ -208,6 +220,7 @@ table th {
     background-color: rgba(255, 255, 255, 0.05);
     border-radius: 5px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    box-sizing: border-box;
 }
 
 .form-title {
@@ -232,6 +245,7 @@ input[type="email"], input[type="password"], input[type="text"] {
     background-color: rgba(255, 255, 255, 0.1);
     color: white;
     font-family: 'JetBrains Mono', monospace;
+    box-sizing: border-box;
 }
 
 input[type="email"]:focus, input[type="password"]:focus, input[type="text"]:focus {
@@ -258,8 +272,99 @@ button:hover {
 
 /* 响应式设计 */
 @media (max-width: 768px) {
+    body {
+        font-size: 18px;
+    }
+    
+    .container {
+        padding: 15px;
+        width: 95%;
+        box-sizing: border-box;
+    }
+    
+    h1 {
+        font-size: 2.2em;
+        margin-top: 20px;
+    }
+    
+    h2 {
+        font-size: 1.8em;
+        margin-top: 30px;
+    }
+    
+    h3 {
+        font-size: 1.5em;
+    }
+    
+    input[type="email"], input[type="password"], input[type="text"] {
+        padding: 15px;
+        font-size: 16px;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+    
+    button {
+        padding: 16px;
+        font-size: 18px;
+    }
+    
+    .form-container {
+        max-width: 95%;
+        margin: 20px auto;
+        padding: 25px 15px;
+        box-sizing: border-box;
+    }
+    
+    code {
+        font-size: 1em;
+        padding: 3px 6px;
+    }
+    
+    pre {
+        padding: 15px 10px;
+        font-size: 14px;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+    
+    table th, table td {
+        padding: 15px 10px;
+    }
+    
+    .endpoint {
+        padding: 15px;
+        width: 100%;
+        box-sizing: border-box;
+        overflow-x: hidden;
+    }
+    
+    .method {
+        padding: 8px 12px;
+        margin-bottom: 10px;
+    }
+    
+    form {
+        width: 100%;
+        max-width: 100%;
+    }
+    
+    .url {
+        font-size: 0.9em;
+        word-break: break-all;
+    }
+}
+
+/* 更小屏幕的额外样式 */
+@media (max-width: 480px) {
+    body {
+        font-size: 16px;
+    }
+    
     .container {
         padding: 10px;
+        width: 100%;
+        margin: 0 auto;
     }
     
     h1 {
@@ -267,12 +372,125 @@ button:hover {
     }
     
     h2 {
-        font-size: 1.7em;
+        font-size: 1.6em;
     }
     
+    table {
+        font-size: 14px;
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+    
+    table th, table td {
+        padding: 12px 8px;
+    }
+    
+    .note, .warning, .error, .success {
+        padding: 12px;
+    }
+    
+    pre {
+        padding: 12px 8px;
+        font-size: 13px;
+        max-width: 100%;
+        overflow-x: auto;
+    }
+    
+    button {
+        padding: 15px;
+        min-height: 50px;
+        touch-action: manipulation;
+    }
+    
+    .endpoint {
+        padding: 12px 8px;
+    }
+    
+    .url {
+        font-size: 0.9em;
+        word-break: break-all;
+    }
+    
+    input[type="email"], input[type="password"], input[type="text"] {
+        font-size: 16px; /* 防止iOS上自动缩放 */
+        padding: 12px 8px;
+        margin-bottom: 15px;
+    }
+}
+
+/* 响应式表格 - 小屏幕专用 */
+@media (max-width: 600px) {
+    table.responsive {
+        border: 0;
+        width: 100%;
+    }
+    
+    table.responsive thead {
+        display: none;
+    }
+    
+    table.responsive tr {
+        margin-bottom: 15px;
+        display: block;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    table.responsive td {
+        display: block;
+        text-align: right;
+        padding: 10px;
+        position: relative;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    table.responsive td:before {
+        content: attr(data-label);
+        float: left;
+        font-weight: bold;
+        text-transform: uppercase;
+        font-size: 0.85em;
+        color: rgba(255, 255, 255, 0.7);
+    }
+    
+    table.responsive td:last-child {
+        border-bottom: 0;
+    }
+}
+
+/* 登录和注册表单样式 - 小屏幕优化 */
+@media (max-width: 480px) {
     .form-container {
-        max-width: 90%;
-        margin: 30px auto;
-        padding: 20px;
+        max-width: 100%;
+        margin: 20px auto;
+        padding: 20px 15px;
+    }
+    
+    form label {
+        font-size: 16px;
+        margin-bottom: 8px;
+    }
+    
+    form input[type="email"], 
+    form input[type="password"], 
+    form input[type="text"] {
+        margin-bottom: 20px;
+        height: 50px; /* 增大触摸区域 */
+    }
+    
+    form button {
+        height: 50px;
+        font-size: 18px;
+    }
+}
+
+/* 修复iOS中的按钮样式 */
+@media (max-width: 768px) {
+    button,
+    input[type="submit"] {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        border-radius: 4px;
     }
 } 
