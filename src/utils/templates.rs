@@ -6,6 +6,9 @@ pub static LOGIN_PAGE: &str = include_str!("../templates/login.html");
 /// 注册页面HTML模板
 pub static REGISTER_PAGE: &str = include_str!("../templates/register.html");
 
+/// 欢迎页面HTML模板
+pub static WELCOME_PAGE: &str = include_str!("../templates/welcome.html");
+
 /// 警告页面HTML模板
 pub static WARNING_PAGE: &str = include_str!("../templates/warning.html");
 
@@ -50,4 +53,9 @@ pub fn render_login(status: &str, client_id: &str, redirect_uri: &str,
 /// 渲染警告页面
 pub fn render_warning(message: &str) -> String {
     format_template(WARNING_PAGE, &[&message])
+}
+
+/// 渲染欢迎页面
+pub fn render_welcome(username: &str, redirect_url: &str) -> String {
+    format_template(WELCOME_PAGE, &[&username, &redirect_url])
 } 

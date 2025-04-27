@@ -99,40 +99,42 @@
                     if(formElements.namedItem('scope')) scope = formElements.namedItem('scope').value;
                     if(formElements.namedItem('state')) state = formElements.namedItem('state').value;
                     
-                    // 使用同步提交表单方式重定向，确保cookie能被正确处理
-                    const form = document.createElement('form');
-                    form.method = 'GET';
-                    form.action = '/api/oauth/authorize';
-                    
-                    // 添加隐藏字段
-                    function addField(name, value) {
-                        const input = document.createElement('input');
-                        input.type = 'hidden';
-                        input.name = name;
-                        input.value = value;
-                        form.appendChild(input);
-                    }
-                    
-                    addField('client_id', clientId);
-                    addField('redirect_uri', redirectUri);
-                    addField('response_type', responseType);
-                    if (scope) addField('scope', scope);
-                    if (state) addField('state', state);
-                    
-                    // 添加从响应中获取的用户ID
+                    // 获取用户信息
                     try {
                         const userData = await response.json();
                         if (userData && userData.id) {
-                            addField('user_id', userData.id);
-                            console.log('添加用户ID到请求: ', userData.id);
+                            // 重定向到欢迎页面
+                            window.location.href = `/welcome?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=${encodeURIComponent(responseType)}&scope=${encodeURIComponent(scope || '')}&state=${encodeURIComponent(state || '')}&user_id=${encodeURIComponent(userData.id)}&username=${encodeURIComponent(userData.name || userData.username || email)}`;
+                        } else {
+                            // 如果没有用户ID，直接跳到授权页面
+                            const form = document.createElement('form');
+                            form.method = 'GET';
+                            form.action = '/api/oauth/authorize';
+                            
+                            // 添加隐藏字段
+                            function addField(name, value) {
+                                const input = document.createElement('input');
+                                input.type = 'hidden';
+                                input.name = name;
+                                input.value = value;
+                                form.appendChild(input);
+                            }
+                            
+                            addField('client_id', clientId);
+                            addField('redirect_uri', redirectUri);
+                            addField('response_type', responseType);
+                            if (scope) addField('scope', scope);
+                            if (state) addField('state', state);
+                            
+                            // 添加到文档并提交
+                            document.body.appendChild(form);
+                            form.submit();
                         }
                     } catch(e) {
                         console.error('无法解析用户数据', e);
+                        // 登录成功但无法解析用户数据，仍然重定向到授权页面
+                        window.location.href = `/api/oauth/authorize?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=${encodeURIComponent(responseType)}&scope=${encodeURIComponent(scope || '')}&state=${encodeURIComponent(state || '')}`;
                     }
-                    
-                    // 添加到文档并提交
-                    document.body.appendChild(form);
-                    form.submit();
                 } else {
                     const error = await response.text();
                     document.getElementById('error').textContent = `认证失败: ${error}`;

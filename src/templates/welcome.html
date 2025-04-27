@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Lycrex 认证 - 欢迎</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        .welcome-container {
+            text-align: center;
+            padding: 20px;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        .countdown {
+            font-size: 1.2em;
+            margin: 20px 0;
+            color: #3498db;
+        }
+        .user-info {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container welcome-container">
+        <h1>欢迎回来</h1>
+        <div class="user-info">
+            <h2>欢迎，<span id="username">{}</span>！</h2>
+            <p>您已成功登录到 Lycrex 认证系统</p>
+        </div>
+        <div class="countdown">
+            <p><span id="countdown">5</span> 秒后将自动跳转...</p>
+        </div>
+        <p>如果没有自动跳转，请点击 <a href="#" id="redirectLink">这里</a> 继续。</p>
+    </div>
+    
+    <script>
+        let countdown = 5;
+        const countdownElement = document.getElementById('countdown');
+        const redirectUrl = "{}"; // 将被服务器端替换
+        
+        // 设置重定向链接
+        document.getElementById('redirectLink').href = redirectUrl;
+        
+        // 倒计时功能
+        const timer = setInterval(() => {
+            countdown--;
+            countdownElement.textContent = countdown;
+            
+            if (countdown <= 0) {
+                clearInterval(timer);
+                window.location.href = redirectUrl;
+            }
+        }, 1000);
+        
+        // 如果页面被隐藏/最小化，返回时重置倒计时
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && countdown > 0) {
+                clearInterval(timer);
+                countdown = Math.min(countdown, 3); // 如果返回页面，最多等待3秒
+                countdownElement.textContent = countdown;
+                
+                // 重新启动倒计时
+                const newTimer = setInterval(() => {
+                    countdown--;
+                    countdownElement.textContent = countdown;
+                    
+                    if (countdown <= 0) {
+                        clearInterval(newTimer);
+                        window.location.href = redirectUrl;
+                    }
+                }, 1000);
+            }
+        });
+    </script>
+</body>
+</html> 
