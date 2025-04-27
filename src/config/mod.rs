@@ -1,6 +1,5 @@
 use serde::Deserialize;
 use config::{Config as ConfigCrate, ConfigError, Environment, File};
-use std::env;
 use log::info;
 use std::sync::OnceLock;
 
@@ -47,6 +46,8 @@ pub struct SecurityConfig {
     pub refresh_token_lifetime: i64,
     /// 授权码生命周期（秒）
     pub authorization_code_lifetime: i64,
+    /// 是否需要邮箱验证才能登录
+    pub require_email_verification: bool,
 }
 
 /// 管理员配置
@@ -79,28 +80,13 @@ static CONFIG: OnceLock<Config> = OnceLock::new();
 impl Config {
     /// 加载配置
     /// 
-    /// 配置加载顺序（后面的会覆盖前面的）：
-    /// 1. 默认配置文件 (config/default.toml)
-    /// 2. 环境特定配置文件 (config/{environment}.toml)
-    /// 3. 本地覆盖配置 (config/local.toml)
-    /// 4. 环境变量 (APP_*)
+    /// 从config/app.toml文件加载配置
     pub fn load() -> Result<Self, ConfigError> {
-        // 获取运行环境
-        let environment = env::var("RUN_ENV").unwrap_or_else(|_| String::from("development"));
-        println!("加载配置环境: {}", environment);
-        
-        // 获取配置目录
-        let config_dir = env::var("CONFIG_DIR").unwrap_or_else(|_| String::from("config"));
-        
         // 构建配置
         let builder = ConfigCrate::builder()
-            // 1. 默认配置
-            .add_source(File::with_name(&format!("{}/default", config_dir)).required(false))
-            // 2. 环境特定配置
-            .add_source(File::with_name(&format!("{}/{}", config_dir, environment)).required(false))
-            // 3. 本地覆盖配置（不提交到版本控制）
-            .add_source(File::with_name(&format!("{}/local", config_dir)).required(false))
-            // 4. 环境变量 (APP_开头)
+            // 使用config/app.toml作为唯一配置文件
+            .add_source(File::with_name("config/app.toml").required(false))
+            // 仍然保留环境变量方式，确保可以通过环境变量覆盖配置
             .add_source(Environment::with_prefix("APP").separator("_"));
             
         // 构建并解析配置
@@ -125,12 +111,12 @@ impl Config {
         CONFIG.get_or_init(|| {
             match Self::load() {
                 Ok(config) => {
-                    info!("已从配置文件加载配置");
+                    info!("已从config/app.toml加载配置");
                     config
                 },
                 Err(e) => {
                     // 如果加载失败，使用默认配置并记录错误
-                    log::error!("从配置文件加载配置失败: {}", e);
+                    log::error!("从config/app.toml加载配置失败: {}", e);
                     log::warn!("使用默认配置");
                     Self::default()
                 }
@@ -167,6 +153,7 @@ impl Default for Config {
                 access_token_lifetime: 3600,
                 refresh_token_lifetime: 30,
                 authorization_code_lifetime: 600,
+                require_email_verification: true, // 默认需要邮箱验证
             },
             admin: AdminConfig {
                 password: "admin123".to_string(), // 默认密码，生产环境应该更改

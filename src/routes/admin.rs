@@ -27,6 +27,6 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .route("/users", web::post().to(admin_handlers::create_user))
             .route("/users/{id}", web::put().to(admin_handlers::update_user))
             .route("/users/{id}", web::delete().to(admin_handlers::delete_user))
-            .route("/users/{id}/verify-email", web::post().to(admin_handlers::verify_user_email))
+            .route("/users/{id}/toggle-email-verification", web::post().to(admin_handlers::toggle_user_email_verification))
     );
 } 

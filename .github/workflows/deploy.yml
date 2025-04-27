@@ -219,7 +219,6 @@ jobs:
           # 初始化数据库
           if [ -f "${{ vars.DEPLOY_PATH }}/scripts/init_db.sh" ]; then
             cd ${{ vars.DEPLOY_PATH }}
-            export RUN_ENV="production"
             export POSTGRES_USER="${{ secrets.DB_USER || secrets.SERVER_USERNAME }}"
             export POSTGRES_PASSWORD="${{ secrets.DB_PASSWORD }}"
             export POSTGRES_HOST="${{ secrets.DB_HOST || 'localhost' }}"

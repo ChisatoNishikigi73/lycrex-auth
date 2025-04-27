@@ -67,6 +67,13 @@ pub struct UpdateUserRequest {
     pub avatar_url: Option<String>,
 }
 
+/// 更新邮箱验证状态的请求数据结构
+#[derive(Debug, Deserialize)]
+pub struct ToggleEmailVerificationRequest {
+    /// 邮箱验证状态
+    pub email_verified: bool,
+}
+
 /// 用户列表查询参数
 #[derive(Debug, Deserialize)]
 pub struct UserListParams {
@@ -526,15 +533,16 @@ pub async fn delete_user(
     }
 }
 
-/// 验证用户邮箱
-pub async fn verify_user_email(
+/// 切换用户邮箱验证状态
+pub async fn toggle_user_email_verification(
     path: web::Path<Uuid>,
+    data: web::Json<ToggleEmailVerificationRequest>,
     db: web::Data<PgPool>,
     session: Session,
 ) -> impl Responder {
     // 验证管理员是否已登录
     if !is_admin_authenticated(&session) {
-        log::warn!("未登录尝试验证用户邮箱");
+        log::warn!("未登录尝试切换用户邮箱验证状态");
         return HttpResponse::Unauthorized()
             .content_type("application/json")
             .json(serde_json::json!({ "error": "未登录或会话已过期，请重新登录" }));
@@ -543,15 +551,19 @@ pub async fn verify_user_email(
     let user_id = path.into_inner();
     
     // 更新邮箱验证状态
-    match user_service::update_user_email_verified(user_id, true, &db).await {
+    match user_service::update_user_email_verified(user_id, data.email_verified, &db).await {
         Ok(user) => {
-            log::info!("用户邮箱验证成功，ID: {}", user_id);
+            log::info!(
+                "用户邮箱验证状态已修改，ID: {}, 状态: {}", 
+                user_id, 
+                if data.email_verified { "已验证" } else { "未验证" }
+            );
             HttpResponse::Ok()
                 .content_type("application/json")
                 .json(user)
         },
         Err(err) => {
-            log::error!("验证用户邮箱失败：{}", err);
+            log::error!("修改用户邮箱验证状态失败：{}", err);
             HttpResponse::BadRequest()
                 .content_type("application/json")
                 .json(serde_json::json!({ "error": err.to_string() }))

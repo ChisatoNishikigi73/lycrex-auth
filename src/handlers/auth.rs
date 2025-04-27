@@ -53,6 +53,47 @@ pub async fn authorize(
             // 验证用户ID是否有效
             match Uuid::parse_str(user_id) {
                 Ok(id) => {
+                    // 检查用户邮箱是否已验证
+                    match user_service::find_user_by_id(id, &db).await {
+                        Ok(Some(user)) => {
+                            // 获取全局配置
+                            let config = crate::config::Config::get_global();
+                            
+                            // 根据配置决定是否检查邮箱验证状态
+                            if config.security.require_email_verification && !user.email_verified {
+                                log::warn!("用户 {} 邮箱未验证，拒绝授权", id);
+                                session.purge(); // 清除会话
+                                
+                                // 返回错误信息，可以重定向到一个专门的错误页面
+                                return HttpResponse::Forbidden()
+                                    .content_type("text/html; charset=utf-8")
+                                    .body(format!("<html><body><h2>授权失败</h2><p>您的邮箱尚未验证。请联系管理员进行验证后再尝试登录。</p><p><a href='/login'>返回登录</a></p></body></html>"));
+                            }
+                        },
+                        Ok(None) => {
+                            log::warn!("用户ID在数据库中不存在: {}", id);
+                            session.purge();
+                            let redirect_url = format!(
+                                "/login?client_id={}&redirect_uri={}&response_type={}&scope={}&state={}",
+                                query.client_id,
+                                query.redirect_uri,
+                                query.response_type,
+                                query.scope.as_deref().unwrap_or(""),
+                                query.state.as_deref().unwrap_or("")
+                            );
+                            
+                            return HttpResponse::TemporaryRedirect()
+                                .append_header(("Location", redirect_url))
+                                .finish();
+                        },
+                        Err(e) => {
+                            log::error!("验证用户邮箱时数据库错误: {}", e);
+                            return HttpResponse::InternalServerError()
+                                .content_type("text/html; charset=utf-8")
+                                .body("<html><body><h2>服务器错误</h2><p>无法验证用户状态，请稍后再试。</p></body></html>");
+                        }
+                    }
+                    
                     // 创建授权码
                     log::info!("为用户 {} 创建授权码", id);
                     match auth_service::create_authorization(id, &query, &db).await {
@@ -72,7 +113,7 @@ pub async fn authorize(
                         }
                         Err(err) => {
                             log::error!("创建授权码失败: {}", err);
-                            return HttpResponse::BadRequest().json(err.to_string());
+                            return HttpResponse::BadRequest().json(err.to_string())
                         }
                     }
                 },
@@ -145,71 +186,25 @@ pub async fn authorize(
         Ok(id) => {
             log::info!("成功解析用户ID为Uuid: {}", id);
             
-            // 验证用户ID是否有效
+            // 检查用户邮箱是否已验证
             match user_service::find_user_by_id(id, &db).await {
-                Ok(Some(_)) => {
-                    log::info!("已验证用户ID在数据库中存在: {}", id);
+                Ok(Some(user)) => {
+                    // 获取全局配置
+                    let config = crate::config::Config::get_global();
                     
-                    // 检查该用户是否有任何有效令牌（即未被吊销的令牌）
-                    match sqlx::query(r#"SELECT COUNT(*) FROM tokens WHERE user_id = $1 AND revoked = false"#)
-                        .bind(id)
-                        .fetch_one(db.get_ref())
-                        .await 
-                    {
-                        Ok(row) => {
-                            let token_count: i64 = row.get(0);
-                            log::info!("用户 {} 有 {} 个有效令牌", id, token_count);
-                            
-                            // 如果用户没有有效令牌，强制重新登录
-                            if token_count == 0 {
-                                log::info!("用户 {} 没有有效令牌，强制重新登录", id);
-                                session.purge();
-                                let redirect_url = format!(
-                                    "/login?client_id={}&redirect_uri={}&response_type={}&scope={}&state={}",
-                                    query.client_id,
-                                    query.redirect_uri,
-                                    query.response_type,
-                                    query.scope.as_deref().unwrap_or(""),
-                                    query.state.as_deref().unwrap_or("")
-                                );
-                                
-                                log::info!("重定向到登录页面: {}", redirect_url);
-                                return HttpResponse::TemporaryRedirect()
-                                    .append_header(("Location", redirect_url))
-                                    .finish();
-                            }
-                        },
-                        Err(e) => {
-                            log::error!("检查用户令牌时数据库错误: {}", e);
-                        }
-                    }
-                    
-                    // 创建授权码
-                    log::info!("为用户 {} 创建授权码", id);
-                    match auth_service::create_authorization(id, &query, &db).await {
-                        Ok(code) => {
-                            // 构建重定向URL
-                            let mut redirect_url = format!("{}?code={}", query.redirect_uri, code);
-                            
-                            // 添加state参数（如果存在）
-                            if let Some(state) = &query.state {
-                                redirect_url.push_str(&format!("&state={}", state));
-                            }
-                            
-                            log::info!("授权成功，重定向到: {}", redirect_url);
-                            HttpResponse::TemporaryRedirect()
-                                .append_header(("Location", redirect_url))
-                                .finish()
-                        }
-                        Err(err) => {
-                            log::error!("创建授权码失败: {}", err);
-                            HttpResponse::BadRequest().json(err.to_string())
-                        },
+                    // 根据配置决定是否检查邮箱验证状态
+                    if config.security.require_email_verification && !user.email_verified {
+                        log::warn!("用户 {} 邮箱未验证，拒绝授权", id);
+                        session.purge(); // 清除会话
+                        
+                        // 返回错误信息，可以重定向到一个专门的错误页面
+                        return HttpResponse::Forbidden()
+                            .content_type("text/html; charset=utf-8")
+                            .body(format!("<html><body><h2>授权失败</h2><p>您的邮箱尚未验证。请联系管理员进行验证后再尝试登录。</p><p><a href='/login'>返回登录</a></p></body></html>"));
                     }
                 },
                 Ok(None) => {
                     log::warn!("用户ID在数据库中不存在: {}", id);
-                    // 用户ID在数据库中不存在，清除会话并重定向到登录页面
                     session.purge();
                     let redirect_url = format!(
                         "/login?client_id={}&redirect_uri={}&response_type={}&scope={}&state={}",
@@ -220,28 +215,73 @@ pub async fn authorize(
                         query.state.as_deref().unwrap_or("")
                     );
                     
-                    log::info!("重定向到登录页面: {}", redirect_url);
-                    HttpResponse::TemporaryRedirect()
+                    return HttpResponse::TemporaryRedirect()
                         .append_header(("Location", redirect_url))
-                        .finish()
+                        .finish();
                 },
                 Err(e) => {
-                    log::error!("验证用户ID时数据库错误: {}", e);
-                    // 数据库错误，重定向到登录页面
-                    let redirect_url = format!(
-                        "/login?client_id={}&redirect_uri={}&response_type={}&scope={}&state={}",
-                        query.client_id,
-                        query.redirect_uri,
-                        query.response_type,
-                        query.scope.as_deref().unwrap_or(""),
-                        query.state.as_deref().unwrap_or("")
-                    );
+                    log::error!("验证用户邮箱时数据库错误: {}", e);
+                    return HttpResponse::InternalServerError()
+                        .content_type("text/html; charset=utf-8")
+                        .body("<html><body><h2>服务器错误</h2><p>无法验证用户状态，请稍后再试。</p></body></html>");
+                }
+            }
+            
+            // 检查该用户是否有任何有效令牌（即未被吊销的令牌）
+            match sqlx::query(r#"SELECT COUNT(*) FROM tokens WHERE user_id = $1 AND revoked = false"#)
+                .bind(id)
+                .fetch_one(db.get_ref())
+                .await 
+            {
+                Ok(row) => {
+                    let token_count: i64 = row.get(0);
+                    log::info!("用户 {} 有 {} 个有效令牌", id, token_count);
                     
-                    log::info!("重定向到登录页面: {}", redirect_url);
+                    // 如果用户没有有效令牌，强制重新登录
+                    if token_count == 0 {
+                        log::info!("用户 {} 没有有效令牌，强制重新登录", id);
+                        session.purge();
+                        let redirect_url = format!(
+                            "/login?client_id={}&redirect_uri={}&response_type={}&scope={}&state={}",
+                            query.client_id,
+                            query.redirect_uri,
+                            query.response_type,
+                            query.scope.as_deref().unwrap_or(""),
+                            query.state.as_deref().unwrap_or("")
+                        );
+                        
+                        log::info!("重定向到登录页面: {}", redirect_url);
+                        return HttpResponse::TemporaryRedirect()
+                            .append_header(("Location", redirect_url))
+                            .finish();
+                    }
+                },
+                Err(e) => {
+                    log::error!("检查用户令牌时数据库错误: {}", e);
+                }
+            }
+            
+            // 创建授权码
+            log::info!("为用户 {} 创建授权码", id);
+            match auth_service::create_authorization(id, &query, &db).await {
+                Ok(code) => {
+                    // 构建重定向URL
+                    let mut redirect_url = format!("{}?code={}", query.redirect_uri, code);
+                    
+                    // 添加state参数（如果存在）
+                    if let Some(state) = &query.state {
+                        redirect_url.push_str(&format!("&state={}", state));
+                    }
+                    
+                    log::info!("授权成功，重定向到: {}", redirect_url);
                     HttpResponse::TemporaryRedirect()
                         .append_header(("Location", redirect_url))
                         .finish()
                 }
+                Err(err) => {
+                    log::error!("创建授权码失败: {}", err);
+                    return HttpResponse::BadRequest().json(err.to_string())
+                },
             }
         },
         Err(e) => {

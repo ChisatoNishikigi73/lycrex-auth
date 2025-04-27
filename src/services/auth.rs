@@ -9,7 +9,6 @@ use crate::models::{
 };
 use crate::utils::{password, random, jwt};
 use crate::config::Config;
-use serde::Serialize;
 
 pub async fn create_authorization(
     user_id: Uuid,
@@ -283,6 +282,14 @@ pub async fn authenticate_user(
         return Err(AppError::AuthError("认证失败".to_string()));
     }
     
+    // 获取全局配置
+    let config = Config::get_global();
+    
+    // 根据配置决定是否检查邮箱验证状态
+    if config.security.require_email_verification && !user.email_verified {
+        return Err(AppError::AuthError("您的邮箱尚未验证。请联系管理员进行验证后再登录。".to_string()));
+    }
+    
     Ok(user)
 }
 
@@ -312,19 +319,6 @@ pub async fn get_client_type_by_token(token: &str, db: &PgPool) -> AppResult<Cli
     .unwrap_or_default();
     
     Ok(client_type)
-}
-
-// 获取用户信息并根据客户端类型格式化响应
-pub async fn get_formatted_user_info<T: Serialize>(
-    user_id: Uuid, 
-    client_type: ClientType,
-    db: &PgPool
-) -> AppResult<T> 
-where 
-    T: for<'a> From<User> + Serialize
-{
-    let user = get_user_info(user_id, db).await?;
-    Ok(T::from(user))
 }
 
 // 尝试将用户信息转换为特定客户端所需的格式

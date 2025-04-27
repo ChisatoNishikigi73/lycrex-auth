@@ -399,7 +399,9 @@
                         <td>${formattedDate}</td>
                         <td class="actions">
                             <button class="edit-btn" data-id="${user.id}" data-username="${user.username}" data-email="${user.email}" data-avatar="${user.avatar_url || ''}">编辑</button>
-                            ${!user.email_verified ? `<button class="verify-btn" data-id="${user.id}">验证邮箱</button>` : ''}
+                            <button class="verify-btn" data-id="${user.id}" data-verified="${user.email_verified}">
+                                ${user.email_verified ? '取消验证' : '验证邮箱'}
+                            </button>
                             <button class="delete-btn" data-id="${user.id}">删除</button>
                         </td>
                     `;
@@ -440,7 +442,17 @@
                 document.querySelectorAll('.verify-btn').forEach(button => {
                     button.addEventListener('click', function() {
                         const userId = this.getAttribute('data-id');
-                        verifyUserEmail(userId);
+                        const isVerified = this.getAttribute('data-verified') === 'true';
+                        
+                        if (isVerified) {
+                            if (confirm('确定要取消该用户的邮箱验证状态吗？')) {
+                                toggleUserEmailVerification(userId, false);
+                            }
+                        } else {
+                            if (confirm('确定要将该用户的邮箱标记为已验证吗？')) {
+                                toggleUserEmailVerification(userId, true);
+                            }
+                        }
                     });
                 });
             }
@@ -528,8 +540,19 @@
             
             // 验证用户邮箱
             function verifyUserEmail(userId) {
-                fetch(`/admin/api/users/${userId}/verify-email`, {
-                    method: 'POST'
+                toggleUserEmailVerification(userId, true);
+            }
+            
+            // 切换用户邮箱验证状态
+            function toggleUserEmailVerification(userId, verifyStatus) {
+                fetch(`/admin/api/users/${userId}/toggle-email-verification`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email_verified: verifyStatus
+                    })
                 })
                 .then(response => {
                     if (!response.ok) {
@@ -547,12 +570,12 @@
                     if (data.error) {
                         showError(data.error);
                     } else {
-                        showSuccess('用户邮箱验证成功！');
+                        showSuccess(verifyStatus ? '用户邮箱验证成功！' : '用户邮箱验证状态已取消！');
                         loadUsers();
                     }
                 })
                 .catch(error => {
-                    showError('验证用户邮箱失败: ' + error.message);
+                    showError(verifyStatus ? '验证用户邮箱失败: ' + error.message : '取消用户邮箱验证失败: ' + error.message);
                 });
             }
             

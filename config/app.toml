@@ -1,0 +1,49 @@
+# Lycrex Auth 配置文件
+# 可以复制此文件为app.ini并根据需要修改
+
+# 服务器配置
+[server]
+# 服务器监听地址
+host = "0.0.0.0"
+# 服务器监听端口
+port = 8080
+# 会话密钥，生产环境必须修改为复杂的随机值
+secret_key = "请在生产环境修改为随机密钥"
+
+# 数据库配置
+[database]
+# PostgreSQL数据库连接URL
+url = "postgres://kawaaanime@localhost/lycrex_auth_test"
+
+# CORS跨域配置
+[cors]
+# 允许的来源域名列表
+allowed_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:8080",
+    "http://localhost:8080"
+]
+
+# 日志配置
+[log]
+# 日志级别：trace, debug, info, warn, error
+level = "info"
+# 日志格式：default, json
+format = "default"
+
+# 安全配置
+[security]
+# 访问令牌生命周期（秒）
+access_token_lifetime = 3600
+# 刷新令牌生命周期（天）
+refresh_token_lifetime = 30
+# 授权码生命周期（秒）
+authorization_code_lifetime = 600
+# 是否需要邮箱验证才能登录
+require_email_verification = false
+
+# 管理员配置
+[admin]
+# 管理员密码，用于管理后台登录
+password = "admin123"
