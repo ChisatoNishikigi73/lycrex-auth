@@ -6,8 +6,11 @@ pub mod client;
 pub mod token;
 /// 授权码模型
 pub mod authorization;
+/// OAuth提供商模型
+pub mod oauth;
  
 pub use user::*;
 pub use client::*;
 pub use token::*;
 pub use authorization::*; 
+pub use oauth::casdoor::CasdoorUserResponse; 

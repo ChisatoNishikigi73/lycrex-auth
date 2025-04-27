@@ -11,6 +11,8 @@ pub enum ClientType {
     OpenId,
     /// Gitea 兼容
     Gitea,
+    /// Casdoor 兼容
+    Casdoor,
     /// 测试客户端
     Test,
 }

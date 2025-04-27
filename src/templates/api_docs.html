@@ -149,6 +149,32 @@
   "refresh_token": "eyJhbGc...",
   "scope": "requested scopes"
 }</pre>
+
+            <h3>重定向URI配置指南</h3>
+            <p>为确保安全，您的应用必须正确配置重定向URI：</p>
+            <table class="responsive">
+                <tr>
+                    <th>类型</th>
+                    <th>格式要求</th>
+                    <th>示例</th>
+                </tr>
+                <tr>
+                    <td data-label="类型">Web应用</td>
+                    <td data-label="格式要求">必须使用HTTPS（生产环境）</td>
+                    <td data-label="示例">https://your-app.com/callback</td>
+                </tr>
+                <tr>
+                    <td data-label="类型">移动应用</td>
+                    <td data-label="格式要求">使用自定义URL方案</td>
+                    <td data-label="示例">com.yourapp://callback</td>
+                </tr>
+                <tr>
+                    <td data-label="类型">本地开发</td>
+                    <td data-label="格式要求">允许HTTP（仅限开发）</td>
+                    <td data-label="示例">http://localhost:3000/callback</td>
+                </tr>
+            </table>
+            <p>注意：重定向URI必须与您在应用注册时提供的URI完全匹配，包括尾部斜杠。</p>
         </div>
 
         <div class="endpoint">
@@ -182,6 +208,171 @@
   "message": "已成功退出登录并吊销令牌"
 }</pre>
         </div>
+
+        <div class="endpoint">
+            <span class="method post">POST</span>
+            <span class="url">/api/oauth/refresh</span>
+            <p>刷新令牌端点，用于在访问令牌过期后获取新的访问令牌。</p>
+            
+            <h3>请求参数</h3>
+            <table class="responsive">
+                <tr>
+                    <th>参数名</th>
+                    <th>类型</th>
+                    <th>必填</th>
+                    <th>描述</th>
+                </tr>
+                <tr>
+                    <td data-label="参数名">grant_type</td>
+                    <td data-label="类型">string</td>
+                    <td data-label="必填">是</td>
+                    <td data-label="描述">必须为 "refresh_token"</td>
+                </tr>
+                <tr>
+                    <td data-label="参数名">refresh_token</td>
+                    <td data-label="类型">string</td>
+                    <td data-label="必填">是</td>
+                    <td data-label="描述">之前获取的刷新令牌</td>
+                </tr>
+                <tr>
+                    <td data-label="参数名">client_id</td>
+                    <td data-label="类型">string</td>
+                    <td data-label="必填">是</td>
+                    <td data-label="描述">您应用的客户端ID</td>
+                </tr>
+                <tr>
+                    <td data-label="参数名">client_secret</td>
+                    <td data-label="类型">string</td>
+                    <td data-label="必填">是</td>
+                    <td data-label="描述">您应用的客户端密钥</td>
+                </tr>
+            </table>
+            
+            <h3>响应</h3>
+            <pre>{
+  "access_token": "新的访问令牌",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "新的刷新令牌",
+  "scope": "授权范围"
+}</pre>
+        </div>
+
+        <h2>第三方应用配置指南</h2>
+        <p>当您在其他平台或身份提供商上配置Lycrex作为认证源时，需要提供以下URL和参数：</p>
+        
+        <table class="responsive">
+            <tr>
+                <th>配置项</th>
+                <th>值</th>
+                <th>描述</th>
+            </tr>
+            <tr>
+                <td data-label="配置项">授权URL (Authorization URL)</td>
+                <td data-label="值">https://auth.lycrex.com/login</td>
+                <td data-label="描述">用户将被重定向到此URL进行身份验证和授权</td>
+            </tr>
+            <tr>
+                <td data-label="配置项">令牌URL (Token URL)</td>
+                <td data-label="值">https://auth.lycrex.com/api/oauth/token</td>
+                <td data-label="描述">用于交换授权码获取访问令牌的端点</td>
+            </tr>
+            <tr>
+                <td data-label="配置项">用户信息URL (Profile URL)</td>
+                <td data-label="值">https://auth.lycrex.com/api/oauth/userinfo</td>
+                <td data-label="描述">用于获取当前授权用户信息的端点</td>
+            </tr>
+            <tr>
+                <td data-label="配置项">刷新令牌URL (Refresh Token URL)</td>
+                <td data-label="值">https://auth.lycrex.com/api/oauth/refresh</td>
+                <td data-label="描述">用于刷新访问令牌的端点</td>
+            </tr>
+            <tr>
+                <td data-label="配置项">授权方式 (Grant Type)</td>
+                <td data-label="值">authorization_code</td>
+                <td data-label="描述">OAuth 2.0授权码流程</td>
+            </tr>
+            <tr>
+                <td data-label="配置项">附加授权范围 (Scopes)</td>
+                <td data-label="值">profile email read:data write:data</td>
+                <td data-label="描述">可根据需求选择不同范围，以空格分隔</td>
+            </tr>
+            <tr>
+                <td data-label="配置项">客户端认证方式</td>
+                <td data-label="值">HTTP Basic 或 Request Body</td>
+                <td data-label="描述">支持两种提交客户端凭据的方式</td>
+            </tr>
+        </table>
+        
+        <div class="note">
+            <p><strong>注意：</strong> 在大多数第三方集成场景中，您需要提前在Lycrex平台注册应用并获取client_id和client_secret。在配置时，确保正确设置回调URL（Redirect URI）。</p>
+        </div>
+
+        <h3>常见第三方平台配置示例</h3>
+        <div class="example-config">
+            <h4>1. 社交登录配置</h4>
+            <ul>
+                <li><strong>提供者名称：</strong> Lycrex</li>
+                <li><strong>认证类型：</strong> OAuth 2.0</li>
+                <li><strong>授权URL：</strong> https://auth.lycrex.com/login</li>
+                <li><strong>令牌URL：</strong> https://auth.lycrex.com/api/oauth/token</li>
+                <li><strong>范围：</strong> profile email</li>
+                <li><strong>用户信息URL：</strong> https://auth.lycrex.com/api/oauth/userinfo</li>
+                <li><strong>用户ID路径：</strong> id</li>
+                <li><strong>用户名路径：</strong> username</li>
+                <li><strong>邮箱路径：</strong> email</li>
+            </ul>
+        </div>
+        
+        <div class="example-config">
+            <h4>2. 企业SSO配置</h4>
+            <ul>
+                <li><strong>身份提供商类型：</strong> OAuth 2.0</li>
+                <li><strong>授权端点：</strong> https://auth.lycrex.com/login</li>
+                <li><strong>令牌端点：</strong> https://auth.lycrex.com/api/oauth/token</li>
+                <li><strong>用户信息端点：</strong> https://auth.lycrex.com/api/oauth/userinfo</li>
+                <li><strong>请求的范围：</strong> profile email</li>
+                <li><strong>客户端ID：</strong> 您的client_id</li>
+                <li><strong>客户端密钥：</strong> 您的client_secret</li>
+                <li><strong>属性映射：</strong> 
+                    <ul>
+                        <li>email ⟶ user.email</li>
+                        <li>id ⟶ user.id</li>
+                        <li>username ⟶ user.name</li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+
+        <h2>权限范围（Scopes）</h2>
+        <p>Lycrex OAuth支持以下权限范围，可在授权请求中使用空格分隔多个范围：</p>
+        <table class="responsive">
+            <tr>
+                <th>Scope名称</th>
+                <th>描述</th>
+                <th>包含权限</th>
+            </tr>
+            <tr>
+                <td data-label="Scope名称">profile</td>
+                <td data-label="描述">基本用户资料信息</td>
+                <td data-label="包含权限">获取用户名、ID、创建时间等基本信息</td>
+            </tr>
+            <tr>
+                <td data-label="Scope名称">email</td>
+                <td data-label="描述">用户电子邮件</td>
+                <td data-label="包含权限">读取用户电子邮件地址</td>
+            </tr>
+            <tr>
+                <td data-label="Scope名称">read:data</td>
+                <td data-label="描述">读取用户数据</td>
+                <td data-label="包含权限">读取用户在平台上的数据</td>
+            </tr>
+            <tr>
+                <td data-label="Scope名称">write:data</td>
+                <td data-label="描述">写入用户数据</td>
+                <td data-label="包含权限">在平台上创建或修改用户数据</td>
+            </tr>
+        </table>
 
         <h2>示例代码</h2>
         

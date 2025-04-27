@@ -354,6 +354,12 @@ pub async fn get_user_info_for_client(
             
             response
         },
+        ClientType::Casdoor => {
+            // 返回Casdoor格式
+            let response = crate::models::oauth::casdoor::CasdoorUserResponse::from(user);
+            serde_json::to_value(response)
+                .map_err(|e| AppError::InternalServerError(format!("序列化用户信息失败：{}", e)))?
+        },
         ClientType::Test => {
             // 返回测试格式
             let response = TestUserResponse::from(user);
