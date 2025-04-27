@@ -1,13 +1,15 @@
 use chrono::{Duration, Utc};
-use sqlx::{PgPool, query, query_as};
+use sqlx::{PgPool, query, query_as, Row};
 use uuid::Uuid;
 
 use crate::errors::{AppError, AppResult};
 use crate::models::{
-    Authorization, AuthorizationRequest, Client, GrantType, Token, TokenRequest, User,
+    Authorization, AuthorizationRequest, Client, ClientType, GrantType, Token, TokenRequest, User,
+    OpenIdUserResponse, GiteaUserResponse, TestUserResponse
 };
 use crate::utils::{password, random, jwt};
 use crate::config::Config;
+use serde::Serialize;
 
 pub async fn create_authorization(
     user_id: Uuid,
@@ -282,4 +284,89 @@ pub async fn authenticate_user(
     }
     
     Ok(user)
+}
+
+// 根据客户端ID获取客户端类型
+pub async fn get_client_type_by_token(token: &str, db: &PgPool) -> AppResult<ClientType> {
+    // 先验证令牌
+    let _token_data = jwt::verify_token(token)?;
+    
+    // 查询与该令牌相关的客户端
+    let client_type = query(
+        r#"
+        SELECT c.client_type 
+        FROM tokens t
+        JOIN clients c ON t.client_id = c.id
+        WHERE t.access_token = $1 AND t.revoked = false
+        "#)
+    .bind(token)
+    .fetch_optional(db)
+    .await
+    .map_err(AppError::DatabaseError)?
+    .map(|row: sqlx::postgres::PgRow| {
+        match row.try_get::<ClientType, _>("client_type") {
+            Ok(ct) => ct,
+            Err(_) => ClientType::default()
+        }
+    })
+    .unwrap_or_default();
+    
+    Ok(client_type)
+}
+
+// 获取用户信息并根据客户端类型格式化响应
+pub async fn get_formatted_user_info<T: Serialize>(
+    user_id: Uuid, 
+    client_type: ClientType,
+    db: &PgPool
+) -> AppResult<T> 
+where 
+    T: for<'a> From<User> + Serialize
+{
+    let user = get_user_info(user_id, db).await?;
+    Ok(T::from(user))
+}
+
+// 尝试将用户信息转换为特定客户端所需的格式
+pub async fn get_user_info_for_client(
+    user_id: Uuid,
+    client_type: ClientType,
+    db: &PgPool
+) -> AppResult<serde_json::Value> {
+    let user = get_user_info(user_id, db).await?;
+    
+    let response = match client_type {
+        ClientType::OpenId => {
+            // 返回OpenID格式
+            let response = OpenIdUserResponse::from(user);
+            serde_json::to_value(response)
+                .map_err(|e| AppError::InternalServerError(format!("序列化用户信息失败：{}", e)))?
+        },
+        ClientType::Gitea => {
+            // 返回Gitea格式，并转换ID为数字
+            let mut response = serde_json::to_value(GiteaUserResponse::from(user))
+                .map_err(|e| AppError::InternalServerError(format!("序列化用户信息失败：{}", e)))?;
+            
+            // Gitea需要数字类型的ID
+            if let Some(id_field) = response.get_mut("id") {
+                // 简单处理：将UUID的前几位转为数字
+                let id_str = id_field.as_str().unwrap_or("");
+                if let Some(first_part) = id_str.split('-').next() {
+                    if let Ok(id_num) = u64::from_str_radix(&first_part, 16) {
+                        *id_field = serde_json::Value::Number(serde_json::Number::from(id_num % 1000000));
+                    }
+                }
+            }
+            
+            response
+        },
+        ClientType::Test => {
+            // 返回测试格式
+            let response = TestUserResponse::from(user);
+            serde_json::to_value(response)
+                .map_err(|e| AppError::InternalServerError(format!("序列化用户信息失败：{}", e)))?
+        },
+    };
+    
+    Ok(response)
 } 

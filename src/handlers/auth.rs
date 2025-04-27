@@ -347,7 +347,7 @@ pub async fn userinfo(
         let user_id = user_data.into_inner().user_id;
         log::info!("从认证中间件获取用户ID: {}", user_id);
         
-        process_userinfo_request(user_id, db).await
+        process_userinfo_request(user_id, token_from_header, db).await
     } else if let Some(token) = token_from_header {
         // 如果没有经过中间件认证但有令牌，尝试手动验证
         match crate::utils::jwt::verify_token(&token) {
@@ -355,7 +355,7 @@ pub async fn userinfo(
                 let user_id = token_data.claims.sub;
                 log::info!("手动验证令牌成功，用户ID: {}", user_id);
                 
-                process_userinfo_request(user_id, db).await
+                process_userinfo_request(user_id, Some(token), db).await
             },
             Err(e) => {
                 log::error!("手动验证令牌失败: {}", e);
@@ -380,7 +380,7 @@ pub async fn userinfo(
                     let user_id = token_data.claims.sub;
                     log::info!("从URL参数验证令牌成功，用户ID: {}", user_id);
                     
-                    process_userinfo_request(user_id, db).await
+                    process_userinfo_request(user_id, Some(token.to_string()), db).await
                 },
                 Err(e) => {
                     log::error!("验证URL中的令牌失败: {}", e);
@@ -397,15 +397,20 @@ pub async fn userinfo(
                 Ok(Some(test_user)) => {
                     log::warn!("用户信息请求无认证，返回测试用户ID: {}", test_user.id);
                     
-                    // 创建Gitea兼容的用户响应
-                    let mut user_response = serde_json::to_value(crate::models::UserResponse::from(test_user)).unwrap();
+                    // 创建Gitea兼容的用户响应（默认假设是Gitea类型）
+                    let test_response = auth_service::get_user_info_for_client(
+                        test_user.id, 
+                        crate::models::ClientType::Gitea, 
+                        &db
+                    ).await;
                     
-                    // Gitea需要数字类型的ID，将UUID转换为一个固定数字
-                    if let Some(id_field) = user_response.get_mut("id") {
-                        *id_field = serde_json::Value::Number(serde_json::Number::from(1));
+                    match test_response {
+                        Ok(response) => HttpResponse::Ok().json(response),
+                        Err(e) => {
+                            log::error!("创建测试用户响应失败: {}", e);
+                            HttpResponse::InternalServerError().json(e.to_string())
+                        }
                     }
-                    
-                    HttpResponse::Ok().json(user_response)
                 },
                 _ => {
                     // 如果没有认证用户，返回未认证错误
@@ -418,29 +423,33 @@ pub async fn userinfo(
 }
 
 // 处理用户信息请求的辅助函数
-async fn process_userinfo_request(user_id: Uuid, db: web::Data<PgPool>) -> HttpResponse {
-    match auth_service::get_user_info(user_id, &db).await {
-        Ok(user) => {
-            log::info!("成功获取用户信息: {}", user.id);
-            
-            // 创建Gitea兼容的用户响应
-            let mut user_response = serde_json::to_value(crate::models::UserResponse::from(user)).unwrap();
-            
-            // Gitea需要数字类型的ID
-            if let Some(id_field) = user_response.get_mut("id") {
-                // 简单处理：将UUID的前几位转为数字
-                let id_str = id_field.as_str().unwrap_or("");
-                if let Some(first_part) = id_str.split('-').next() {
-                    if let Ok(id_num) = u64::from_str_radix(&first_part, 16) {
-                        *id_field = serde_json::Value::Number(serde_json::Number::from(id_num % 1000000));
-                    } else {
-                        // 如果转换失败，使用固定ID
-                        *id_field = serde_json::Value::Number(serde_json::Number::from(1));
-                    }
-                }
+async fn process_userinfo_request(
+    user_id: Uuid, 
+    token: Option<String>,
+    db: web::Data<PgPool>
+) -> HttpResponse {
+    // 如果有令牌，尝试获取客户端类型
+    let client_type = if let Some(token_str) = token {
+        match auth_service::get_client_type_by_token(&token_str, &db).await {
+            Ok(ct) => {
+                log::info!("获取到客户端类型: {:?}", ct);
+                ct
+            },
+            Err(e) => {
+                log::warn!("获取客户端类型失败，使用默认类型: {}", e);
+                crate::models::ClientType::default()
             }
-            
-            HttpResponse::Ok().json(user_response)
+        }
+    } else {
+        log::info!("没有令牌，使用默认客户端类型");
+        crate::models::ClientType::default()
+    };
+    
+    // 根据客户端类型获取对应格式的用户信息
+    match auth_service::get_user_info_for_client(user_id, client_type, &db).await {
+        Ok(response) => {
+            log::info!("成功获取用户信息: {}, 客户端类型: {:?}", user_id, client_type);
+            HttpResponse::Ok().json(response)
         },
         Err(err) => {
             log::error!("获取用户信息失败: {}", err);
@@ -545,8 +554,8 @@ pub async fn register(
     match user_service::create_user(&user, &db).await {
         Ok(user) => {
             log::info!("用户注册成功，用户ID: {}", user.id);
-            // 返回用户信息，但不包含敏感数据
-            let user_response = crate::models::UserResponse::from(user);
+            // 返回用户信息，使用OpenID Connect标准格式
+            let user_response = crate::models::OpenIdUserResponse::from(user);
             HttpResponse::Created().json(user_response)
         },
         Err(err) => {

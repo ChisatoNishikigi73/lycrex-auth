@@ -3,7 +3,7 @@ use sqlx::{PgPool, query, query_as, Row};
 use uuid::Uuid;
 
 use crate::errors::{AppError, AppResult};
-use crate::models::{AdminUserResponse, User, UserCreate, UserResponse};
+use crate::models::{AdminUserResponse, User, UserCreate, OpenIdUserResponse};
 use crate::utils::password;
 
 // 查找用户ID是否存在
@@ -57,7 +57,7 @@ pub async fn create_user(user: &UserCreate, db: &PgPool) -> AppResult<User> {
     Ok(user)
 }
 
-pub async fn get_user_by_id(id: Uuid, db: &PgPool) -> AppResult<UserResponse> {
+pub async fn get_user_by_id(id: Uuid, db: &PgPool) -> AppResult<OpenIdUserResponse> {
     let user = query_as::<_, User>(r#"SELECT * FROM users WHERE id = $1"#)
     .bind(id)
     .fetch_optional(db)
@@ -65,7 +65,7 @@ pub async fn get_user_by_id(id: Uuid, db: &PgPool) -> AppResult<UserResponse> {
     .map_err(AppError::DatabaseError)?
     .ok_or_else(|| AppError::NotFound("用户未找到".to_string()))?;
     
-    Ok(UserResponse::from(user))
+    Ok(OpenIdUserResponse::from(user))
 }
 
 /// 获取用户列表，支持分页和搜索
@@ -146,7 +146,7 @@ pub async fn update_user(
     email: Option<String>,
     avatar_url: Option<String>,
     db: &PgPool,
-) -> AppResult<UserResponse> {
+) -> AppResult<OpenIdUserResponse> {
     // 检查用户是否存在
     let user = query_as::<_, User>(r#"SELECT * FROM users WHERE id = $1"#)
     .bind(id)
@@ -192,7 +192,7 @@ pub async fn update_user(
     .await
     .map_err(AppError::DatabaseError)?;
     
-    Ok(UserResponse::from(updated_user))
+    Ok(OpenIdUserResponse::from(updated_user))
 }
 
 #[allow(dead_code)]
@@ -200,7 +200,7 @@ pub async fn update_user_email_verified(
     id: Uuid,
     email_verified: bool,
     db: &PgPool,
-) -> AppResult<UserResponse> {
+) -> AppResult<OpenIdUserResponse> {
     // 检查用户是否存在
     let _ = query_as::<_, User>(r#"SELECT * FROM users WHERE id = $1"#)
     .bind(id)
@@ -226,7 +226,7 @@ pub async fn update_user_email_verified(
     .await
     .map_err(AppError::DatabaseError)?;
     
-    Ok(UserResponse::from(updated_user))
+    Ok(OpenIdUserResponse::from(updated_user))
 }
 
 /// 删除用户

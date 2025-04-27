@@ -267,6 +267,11 @@
                 </div>
                 
                 <div>
+                    <label for="edit-password">密码（留空表示不修改）</label>
+                    <input type="password" id="edit-password" name="edit-password" placeholder="新密码">
+                </div>
+                
+                <div>
                     <label for="edit-avatar-url">头像URL</label>
                     <input type="text" id="edit-avatar-url" name="edit-avatar-url" placeholder="头像URL">
                 </div>
@@ -610,7 +615,20 @@
                 const userId = document.getElementById('edit-id').value;
                 const username = document.getElementById('edit-username').value;
                 const email = document.getElementById('edit-email').value;
+                const password = document.getElementById('edit-password').value;
                 const avatarUrl = document.getElementById('edit-avatar-url').value;
+                
+                // 构建提交数据对象
+                const userData = {
+                    username,
+                    email,
+                    avatar_url: avatarUrl || null
+                };
+                
+                // 只有当密码字段有值时才添加到请求数据中
+                if (password) {
+                    userData.password = password;
+                }
                 
                 // 发送到服务器
                 fetch(`/admin/api/users/${userId}`, {
@@ -618,11 +636,7 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        username,
-                        email,
-                        avatar_url: avatarUrl || null
-                    })
+                    body: JSON.stringify(userData)
                 })
                 .then(response => {
                     if (!response.ok) {

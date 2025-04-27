@@ -5,7 +5,7 @@ use uuid::Uuid;
 use actix_session::Session;
 
 use crate::config::Config;
-use crate::models::{ClientCreate, UserCreate};
+use crate::models::{ClientCreate, UserCreate, ClientType};
 use crate::services::{client as client_service, user as user_service};
 
 /// 创建提供方请求数据结构
@@ -19,6 +19,8 @@ pub struct CreateProviderRequest {
     pub client_secret: String,
     /// 重定向URI列表
     pub redirect_uris: Vec<String>,
+    /// 客户端类型
+    pub client_type: Option<ClientType>,
 }
 
 /// 更新提供方请求数据结构
@@ -26,8 +28,14 @@ pub struct CreateProviderRequest {
 pub struct UpdateProviderRequest {
     /// 提供方名称
     pub name: Option<String>,
+    /// 客户端ID
+    pub client_id: Option<String>,
+    /// 客户端密钥
+    pub client_secret: Option<String>,
     /// 重定向URI列表
     pub redirect_uris: Option<Vec<String>>,
+    /// 客户端类型
+    pub client_type: Option<ClientType>,
 }
 
 /// 管理员登录请求数据结构
@@ -196,6 +204,7 @@ pub async fn create_provider(
         redirect_uris: data.redirect_uris.clone(),
         allowed_grant_types: vec!["authorization_code".to_string(), "refresh_token".to_string()],
         allowed_scopes: vec!["profile".to_string(), "email".to_string()],
+        client_type: data.client_type.clone(),
     };
     
     // 使用自定义的client_id和client_secret创建客户端
@@ -305,25 +314,54 @@ pub async fn update_provider(
     }
     
     let client_id = path.into_inner();
-    match client_service::update_client(
+    
+    // 首先尝试更新基本信息
+    let update_result = client_service::update_client(
         client_id,
         data.name.clone(),
         data.redirect_uris.clone(),
         None, // 不更新allowed_scopes
+        data.client_type.clone(),
         &db
-    ).await {
-        Ok(client) => {
-            log::info!("提供方更新成功，ID: {}", client_id);
-            HttpResponse::Ok()
-                .content_type("application/json")
-                .json(client)
-        },
-        Err(err) => {
-            log::warn!("更新提供方失败：{}", err);
-            HttpResponse::BadRequest()
-                .content_type("application/json")
-                .json(serde_json::json!({ "error": err.to_string() }))
-        },
+    ).await;
+    
+    // 如果基本信息更新成功且有需要更新客户端ID或密钥
+    if let Ok(mut client) = update_result {
+        // 检查是否需要更新客户端ID或密钥
+        if data.client_id.is_some() || data.client_secret.is_some() {
+            match client_service::update_client_credentials(
+                client_id,
+                data.client_id.clone(),
+                data.client_secret.clone(),
+                &db
+            ).await {
+                Ok(updated) => {
+                    client = updated;
+                    log::info!("提供方凭据更新成功，ID: {}", client_id);
+                },
+                Err(err) => {
+                    log::warn!("更新提供方凭据失败：{}", err);
+                    return HttpResponse::BadRequest()
+                        .content_type("application/json")
+                        .json(serde_json::json!({ "error": format!("更新凭据失败: {}", err.to_string()) }));
+                }
+            }
+        }
+        
+        log::info!("提供方更新成功，ID: {}", client_id);
+        HttpResponse::Ok()
+            .content_type("application/json")
+            .json(client)
+    } else if let Err(err) = update_result {
+        log::warn!("更新提供方失败：{}", err);
+        HttpResponse::BadRequest()
+            .content_type("application/json")
+            .json(serde_json::json!({ "error": err.to_string() }))
+    } else {
+        // 这种情况理论上不会发生，但为了安全起见
+        HttpResponse::InternalServerError()
+            .content_type("application/json")
+            .json(serde_json::json!({ "error": "更新提供方时发生未知错误" }))
     }
 }
 
@@ -401,7 +439,7 @@ pub async fn create_user(
     match user_service::create_user(&user_create, &db).await {
         Ok(user) => {
             log::info!("用户创建成功，ID: {}", user.id);
-            let user_response = crate::models::UserResponse::from(user);
+            let user_response = crate::models::OpenIdUserResponse::from(user);
             HttpResponse::Created()
                 .content_type("application/json")
                 .json(user_response)

@@ -4,7 +4,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::middleware::auth::AuthenticatedUser;
-use crate::models::ClientCreate;
+use crate::models::{ClientCreate, ClientType};
 use crate::services::client as client_service;
 
 #[derive(Debug, Deserialize)]
@@ -12,6 +12,7 @@ pub struct UpdateClientRequest {
     name: Option<String>,
     redirect_uris: Option<Vec<String>>,
     allowed_scopes: Option<Vec<String>>,
+    client_type: Option<ClientType>,
 }
 
 // 创建客户端
@@ -61,6 +62,7 @@ pub async fn update_client(
         update.name.clone(),
         update.redirect_uris.clone(),
         update.allowed_scopes.clone(),
+        update.client_type,
         &db,
     )
     .await

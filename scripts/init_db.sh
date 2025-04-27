@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 设置默认值
-DB_USER=${POSTGRES_USER:-postgres}
+DB_USER=${POSTGRES_USER:-root}
 DB_PASSWORD=${POSTGRES_PASSWORD:-""}
 DB_HOST=${POSTGRES_HOST:-localhost}
 DB_PORT=${POSTGRES_PORT:-5432}

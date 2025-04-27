@@ -151,6 +151,15 @@
                 <input type="text" id="redirect_uris" name="redirect_uris" required placeholder="https://example.com/callback">
             </div>
             
+            <div>
+                <label for="client_type">客户端类型</label>
+                <select id="client_type" name="client_type">
+                    <option value="OpenId">OpenID Connect</option>
+                    <option value="Gitea">Gitea兼容</option>
+                    <option value="Test">测试客户端</option>
+                </select>
+            </div>
+            
             <button type="submit">添加提供方</button>
         </form>
         
@@ -186,8 +195,27 @@
                 </div>
                 
                 <div>
+                    <label for="edit-client-id">Client ID</label>
+                    <input type="text" id="edit-client-id" name="edit-client-id" required placeholder="提供方Client ID">
+                </div>
+                
+                <div>
+                    <label for="edit-client-secret">Client Secret</label>
+                    <input type="text" id="edit-client-secret" name="edit-client-secret" required placeholder="提供方Client Secret">
+                </div>
+                
+                <div>
                     <label for="edit-redirect-uris">重定向URI（用逗号分隔多个）</label>
                     <input type="text" id="edit-redirect-uris" name="edit-redirect-uris" required placeholder="https://example.com/callback">
+                </div>
+                
+                <div>
+                    <label for="edit-client-type">客户端类型</label>
+                    <select id="edit-client-type" name="edit-client-type">
+                        <option value="OpenId">OpenID Connect</option>
+                        <option value="Gitea">Gitea兼容</option>
+                        <option value="Test">测试客户端</option>
+                    </select>
                 </div>
                 
                 <button type="submit">保存修改</button>
@@ -209,6 +237,7 @@
                 const clientId = document.getElementById('client_id').value;
                 const clientSecret = document.getElementById('client_secret').value;
                 const redirectUris = document.getElementById('redirect_uris').value.split(',').map(uri => uri.trim());
+                const clientType = document.getElementById('client_type').value;
                 
                 // 发送到服务器
                 fetch('/admin/api/providers', {
@@ -220,7 +249,8 @@
                         name,
                         client_id: clientId,
                         client_secret: clientSecret,
-                        redirect_uris: redirectUris
+                        redirect_uris: redirectUris,
+                        client_type: clientType
                     })
                 })
                 .then(response => {
@@ -272,9 +302,12 @@
                 
                 const id = document.getElementById('edit-id').value;
                 const name = document.getElementById('edit-name').value;
+                const clientId = document.getElementById('edit-client-id').value;
+                const clientSecret = document.getElementById('edit-client-secret').value;
                 const redirectUris = document.getElementById('edit-redirect-uris').value.split(',').map(uri => uri.trim());
+                const clientType = document.getElementById('edit-client-type').value;
                 
-                updateProvider(id, name, redirectUris);
+                updateProvider(id, name, clientId, clientSecret, redirectUris, clientType);
             });
         });
         
@@ -319,7 +352,10 @@
                             <td class="actions">
                                 <button class="edit-btn" data-id="${provider.id}" 
                                     data-name="${provider.name}" 
-                                    data-redirect-uris="${provider.redirect_uris.join(',')}">
+                                    data-client-id="${provider.client_id}"
+                                    data-client-secret="${provider.client_secret}"
+                                    data-redirect-uris="${provider.redirect_uris.join(',')}"
+                                    data-client-type="${provider.client_type}">
                                     编辑
                                 </button>
                                 <button class="delete-btn" data-id="${provider.id}">删除</button>
@@ -343,9 +379,12 @@
                         btn.addEventListener('click', function() {
                             const providerId = this.getAttribute('data-id');
                             const name = this.getAttribute('data-name');
+                            const clientId = this.getAttribute('data-client-id');
+                            const clientSecret = this.getAttribute('data-client-secret');
                             const redirectUris = this.getAttribute('data-redirect-uris');
+                            const clientType = this.getAttribute('data-client-type');
                             
-                            showEditModal(providerId, name, redirectUris);
+                            showEditModal(providerId, name, clientId, clientSecret, redirectUris, clientType);
                         });
                     });
                 })
@@ -355,17 +394,34 @@
         }
         
         // 显示编辑模态框
-        function showEditModal(id, name, redirectUris) {
+        function showEditModal(id, name, clientId, clientSecret, redirectUris, clientType = 'OpenId') {
             const modal = document.getElementById('edit-modal');
             document.getElementById('edit-id').value = id;
             document.getElementById('edit-name').value = name;
+            document.getElementById('edit-client-id').value = clientId;
+            document.getElementById('edit-client-secret').value = clientSecret;
             document.getElementById('edit-redirect-uris').value = redirectUris;
+            
+            // 设置客户端类型
+            const clientTypeSelect = document.getElementById('edit-client-type');
+            if (clientType) {
+                // 查找对应的选项
+                for (let i = 0; i < clientTypeSelect.options.length; i++) {
+                    if (clientTypeSelect.options[i].value === clientType) {
+                        clientTypeSelect.selectedIndex = i;
+                        break;
+                    }
+                }
+            } else {
+                // 默认选择OpenID
+                clientTypeSelect.selectedIndex = 0;
+            }
             
             modal.style.display = 'block';
         }
         
         // 更新提供方
-        function updateProvider(id, name, redirectUris) {
+        function updateProvider(id, name, clientId, clientSecret, redirectUris, clientType) {
             fetch(`/admin/api/providers/${id}`, {
                 method: 'PUT',
                 headers: {
@@ -373,7 +429,10 @@
                 },
                 body: JSON.stringify({
                     name: name,
-                    redirect_uris: redirectUris
+                    client_id: clientId,
+                    client_secret: clientSecret,
+                    redirect_uris: redirectUris,
+                    client_type: clientType
                 })
             })
             .then(response => {
