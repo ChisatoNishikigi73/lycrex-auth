@@ -23,7 +23,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
 }
 
 /// 根据UUID获取用户头像
-#[get("/{uuid}/avatar.png")]
+#[get("/avatar/{uuid}")]
 async fn get_user_avatar(
     path: web::Path<String>,
     query: web::Query<ImageParams>,
@@ -120,3 +120,7 @@ fn decode_avatar_base64(avatar_base64: &str) -> Result<Vec<u8>, base64::DecodeEr
     // 解码base64数据
     STANDARD.decode(base64_data)
 } 
+
+pub fn get_avatar_url_by_id(user_id: Uuid) -> String {
+    format!("http://127.0.0.1:8080/api/service/avatar/{}", user_id)
+}

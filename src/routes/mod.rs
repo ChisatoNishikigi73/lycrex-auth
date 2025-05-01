@@ -3,7 +3,7 @@ mod clients;
 mod users;
 mod pages;
 mod admin;
-mod service;
+pub mod service;
 
 use actix_web::web;
 use crate::utils::static_files::serve_static_file;

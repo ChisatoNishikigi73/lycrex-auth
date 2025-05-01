@@ -8,11 +8,14 @@ pub mod token;
 pub mod authorization;
 /// OAuth提供商模型
 pub mod oauth;
+/// 登录统计模型
+pub mod login_stats;
  
 pub use user::*;
 pub use client::*;
 pub use token::*;
 pub use authorization::*; 
+pub use login_stats::*;
 
 // 导出各种OAuth响应结构体
 #[allow(unused)]

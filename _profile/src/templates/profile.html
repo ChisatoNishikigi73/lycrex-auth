@@ -259,7 +259,7 @@
         // 页面加载完成后获取用户信息
         document.addEventListener('DOMContentLoaded', function() {
             fetchUserInfo();
-            fetchRecentClients(); // 加载最近登录的客户端
+            fetchLoginStats(); // 使用新的API加载客户端统计
         });
 
         // 获取用户信息的函数
@@ -289,7 +289,6 @@
 
         // 更新用户界面的函数
         function updateUserInterface(user) {
-
             console.log(user);
             // 更新头像
             const avatarElement = document.getElementById('user-avatar');
@@ -398,56 +397,75 @@
             return url;
         }
 
-        // 获取最近登录的客户端
-        async function fetchRecentClients() {
+        // 获取登录统计信息，用于更新最近登录的客户端
+        async function fetchLoginStats() {
             try {
-                const response = await fetch('/api/user/recent-clients');
+                const response = await fetch('/api/user/login-stats');
                 
                 if (!response.ok) {
                     // 如果响应不成功，处理错误
                     if (response.status === 401) {
-                        // 未授权，可能需要重新登录
                         window.location.href = '/';
                         return;
                     }
-                    throw new Error('获取最近登录客户端失败');
+                    throw new Error('获取登录统计失败');
                 }
                 
-                const clients = await response.json();
+                const statsData = await response.json();
                 
-                // 更新UI显示最近登录的客户端
-                displayRecentClients(clients);
+                // 从登录统计中提取客户端信息并更新UI
+                if (statsData && statsData.client_stats) {
+                    displayRecentClients(statsData.client_stats, statsData);
+                } else {
+                    displayRecentClientsError('无法获取客户端统计信息');
+                }
             } catch (error) {
-                console.error('获取最近登录客户端出错:', error);
-                displayRecentClientsError('无法加载最近登录的客户端信息');
+                console.error('获取登录统计出错:', error);
+                displayRecentClientsError('无法加载登录统计信息');
             }
         }
         
         // 显示最近登录的客户端
-        function displayRecentClients(clients) {
+        function displayRecentClients(clientStats, statsData) {
             const container = document.getElementById('recent-clients-list');
             
             // 清空加载指示器
             container.innerHTML = '';
             
-            if (!clients || clients.length === 0) {
+            if (!clientStats || clientStats.length === 0) {
                 container.innerHTML = '<div class="loading-indicator">没有找到最近的登录记录</div>';
                 return;
             }
             
+            // 计算时间范围天数
+            let dayRange = 30; // 默认30天
+            if (statsData && statsData.start_date && statsData.end_date) {
+                const startDate = new Date(statsData.start_date);
+                const endDate = new Date(statsData.end_date);
+                dayRange = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24));
+                
+                const rangeElement = document.createElement('div');
+                rangeElement.className = 'date-range-info';
+                rangeElement.style.marginBottom = '15px';
+                rangeElement.style.color = '#aaaaaa';
+                rangeElement.textContent = `最近${dayRange}天`;
+                container.appendChild(rangeElement);
+            }
+            
             // 为每个客户端创建一个项目
-            clients.forEach(client => {
+            clientStats.forEach(client => {
                 // 格式化最后登录时间
                 const lastLogin = new Date(client.last_login);
                 const timeAgo = getTimeAgo(lastLogin);
                 
                 // 确定客户端图标
                 let clientIcon = '🔹';
-                const clientType = client.client_type ? client.client_type.toLowerCase() : '';
                 
-                if (clientType.includes('web')) clientIcon = '🌐';
-                else if (clientType.includes('desktop')) clientIcon = '💻';
-                else if (clientType.includes('mobile')) clientIcon = '📱';
+                // 根据客户端名称判断类型
+                const clientName = client.client_name.toLowerCase();
+                if (clientName.includes('web') || clientName.includes('网页')) clientIcon = '🌐';
+                else if (clientName.includes('desktop') || clientName.includes('桌面')) clientIcon = '💻';
+                else if (clientName.includes('mobile') || clientName.includes('手机')) clientIcon = '📱';
                 
                 const clientElement = document.createElement('div');
                 clientElement.className = 'session-item';
@@ -456,7 +474,7 @@
                         <div class="device-icon">${clientIcon}</div>
                         <div>
                             <div>${client.client_name}</div>
-                            <div class="session-details">最近登录: ${timeAgo}，共登录 ${client.login_count} 次</div>
+                            <div class="session-details">最近登录: ${timeAgo}，过去${dayRange}天内登录 ${client.login_count} 次</div>
                         </div>
                     </div>
                 `;

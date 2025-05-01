@@ -242,6 +242,240 @@ async fn get_user_info_api(
     }
 }
 
+// 获取用户登录统计API
+#[get("/api/user/login-stats")]
+async fn get_login_stats_api(
+    req: HttpRequest, 
+    client: web::Data<reqwest::Client>,
+    oauth_config: web::Data<OAuthConfig>,
+) -> impl Responder {
+    // 检查是否已登录
+    let access_token = match req.cookie("access_token") {
+        Some(cookie) => cookie.value().to_string(),
+        None => {
+            return HttpResponse::Unauthorized().json(serde_json::json!({
+                "error": "未登录或会话已过期"
+            }));
+        }
+    };
+
+    // 从userinfo接口获取用户ID
+    let user_info_url = format!("{}/api/oauth/userinfo", oauth_config.auth_server_url);
+    
+    let user_response = match client
+        .get(&user_info_url)
+        .header("Authorization", format!("Bearer {}", access_token))
+        .send()
+        .await {
+            Ok(resp) => resp,
+            Err(e) => {
+                error!("请求用户信息失败: {}", e);
+                return HttpResponse::InternalServerError().json(serde_json::json!({
+                    "error": "获取用户信息失败"
+                }));
+            }
+        };
+
+    if !user_response.status().is_success() {
+        return HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": "获取用户信息失败"
+        }));
+    }
+
+    // 解析用户ID
+    let user_info = match user_response.json::<serde_json::Value>().await {
+        Ok(json) => json,
+        Err(e) => {
+            error!("解析用户信息失败: {}", e);
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "解析用户信息失败"
+            }));
+        }
+    };
+
+    let user_id = match user_info.get("id") {
+        Some(id) => id.as_str().unwrap_or_default(),
+        None => {
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "用户ID不存在"
+            }));
+        }
+    };
+
+    // 请求登录统计数据
+    let stats_url = format!("{}/api/users/{}/login-stats", oauth_config.auth_server_url, user_id);
+    
+    let stats_response = match client
+        .get(&stats_url)
+        .header("Authorization", format!("Bearer {}", access_token))
+        .send()
+        .await {
+            Ok(resp) => resp,
+            Err(e) => {
+                error!("请求登录统计失败: {}", e);
+                return HttpResponse::InternalServerError().json(serde_json::json!({
+                    "error": "获取登录统计失败"
+                }));
+            }
+        };
+
+    if !stats_response.status().is_success() {
+        let error_text = stats_response.text().await.unwrap_or_default();
+        error!("获取登录统计响应错误: {}", error_text);
+        return HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": "获取登录统计失败"
+        }));
+    }
+
+    // 返回原始JSON响应
+    match stats_response.text().await {
+        Ok(text) => {
+            match serde_json::from_str::<serde_json::Value>(&text) {
+                Ok(json_value) => HttpResponse::Ok().json(json_value),
+                Err(e) => {
+                    error!("解析响应JSON失败: {}", e);
+                    HttpResponse::InternalServerError().json(serde_json::json!({
+                        "error": "无效的JSON响应"
+                    }))
+                }
+            }
+        },
+        Err(e) => {
+            error!("读取响应内容失败: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "读取响应失败"
+            }))
+        }
+    }
+}
+
+// 获取最近登录客户端API
+#[get("/api/user/recent-clients")]
+async fn get_recent_clients_api(
+    req: HttpRequest, 
+    client: web::Data<reqwest::Client>,
+    oauth_config: web::Data<OAuthConfig>,
+) -> impl Responder {
+    // 检查是否已登录
+    let access_token = match req.cookie("access_token") {
+        Some(cookie) => cookie.value().to_string(),
+        None => {
+            return HttpResponse::Unauthorized().json(serde_json::json!({
+                "error": "未登录或会话已过期"
+            }));
+        }
+    };
+
+    // 从userinfo接口获取用户ID
+    let user_info_url = format!("{}/api/oauth/userinfo", oauth_config.auth_server_url);
+    
+    let user_response = match client
+        .get(&user_info_url)
+        .header("Authorization", format!("Bearer {}", access_token))
+        .send()
+        .await {
+            Ok(resp) => resp,
+            Err(e) => {
+                error!("请求用户信息失败: {}", e);
+                return HttpResponse::InternalServerError().json(serde_json::json!({
+                    "error": "获取用户信息失败"
+                }));
+            }
+        };
+
+    if !user_response.status().is_success() {
+        return HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": "获取用户信息失败"
+        }));
+    }
+
+    // 解析用户ID
+    let user_info = match user_response.json::<serde_json::Value>().await {
+        Ok(json) => json,
+        Err(e) => {
+            error!("解析用户信息失败: {}", e);
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "解析用户信息失败"
+            }));
+        }
+    };
+
+    let user_id = match user_info.get("id") {
+        Some(id) => id.as_str().unwrap_or_default(),
+        None => {
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "用户ID不存在"
+            }));
+        }
+    };
+
+    // 获取登录统计数据
+    let stats_url = format!("{}/api/users/{}/login-stats", oauth_config.auth_server_url, user_id);
+    
+    let stats_response = match client
+        .get(&stats_url)
+        .header("Authorization", format!("Bearer {}", access_token))
+        .send()
+        .await {
+            Ok(resp) => resp,
+            Err(e) => {
+                error!("请求登录统计失败: {}", e);
+                return HttpResponse::InternalServerError().json(serde_json::json!({
+                    "error": "获取登录统计失败"
+                }));
+            }
+        };
+
+    if !stats_response.status().is_success() {
+        let error_text = stats_response.text().await.unwrap_or_default();
+        error!("获取登录统计响应错误: {}", error_text);
+        return HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": "获取登录统计失败"
+        }));
+    }
+
+    // 解析登录统计数据，并将客户端统计转换为前端需要的格式
+    let stats_data = match stats_response.json::<serde_json::Value>().await {
+        Ok(json) => json,
+        Err(e) => {
+            error!("解析登录统计失败: {}", e);
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "解析登录统计失败"
+            }));
+        }
+    };
+
+    // 提取client_stats数组并转换为前端需要的格式
+    let client_stats = match stats_data.get("client_stats") {
+        Some(stats) => {
+            if let Some(stats_array) = stats.as_array() {
+                let mut clients = Vec::new();
+                
+                for stat in stats_array {
+                    let client_name = stat.get("client_name").and_then(|n| n.as_str()).unwrap_or("未知客户端");
+                    let login_count = stat.get("login_count").and_then(|c| c.as_i64()).unwrap_or(0);
+                    
+                    clients.push(serde_json::json!({
+                        "client_id": "00000000-0000-0000-0000-000000000000", // 占位ID
+                        "client_name": client_name,
+                        "login_count": login_count,
+                        "last_login": "刚刚", // 由前端计算
+                        "client_type": "标准客户端"
+                    }));
+                }
+                
+                clients
+            } else {
+                Vec::new()
+            }
+        },
+        None => Vec::new()
+    };
+
+    // 返回转换后的客户端列表
+    HttpResponse::Ok().json(client_stats)
+}
+
 // 个人资料页面路由
 #[get("/profile")]
 async fn profile(tmpl: web::Data<tera::Tera>) -> impl Responder {
@@ -435,7 +669,8 @@ async fn main() -> std::io::Result<()> {
             .service(profile)
             .service(logout)
             .service(get_user_info_api)
-            .service(get_recent_clients)
+            .service(get_login_stats_api)
+            .service(get_recent_clients_api)
             .service(Files::new("/static", "src/static"))
     })
     .bind((host, port))?

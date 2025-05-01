@@ -41,7 +41,7 @@ refresh_token_lifetime = 30
 # 授权码生命周期（秒）
 authorization_code_lifetime = 600
 # 是否需要邮箱验证才能登录
-require_email_verification = false
+require_email_verification = true
 
 # 管理员配置
 [admin]

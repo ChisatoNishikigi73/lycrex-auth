@@ -1,9 +1,11 @@
-use chrono::Utc;
+use chrono::{DateTime, Utc};
+use sqlx::prelude::FromRow;
 use sqlx::{PgPool, query, query_as, Row};
 use uuid::Uuid;
+use std::collections::HashMap;
 
 use crate::errors::{AppError, AppResult};
-use crate::models::{AdminUserResponse, User, UserCreate, OpenIdUserResponse};
+use crate::models::{AdminUserResponse, ClientLoginStat, LoginHistoryResponse, LoginRecord, LoginStatsResponse, OpenIdUserResponse, SelfUserResponse, User, UserCreate};
 use crate::utils::password;
 
 // 查找用户ID是否存在
@@ -29,7 +31,7 @@ pub async fn create_user(user: &UserCreate, db: &PgPool) -> AppResult<User> {
         return Err(AppError::ValidationError("邮箱已被注册".to_string()));
     }
     
-    // 哈希密码
+    // 密码
     let password_hash = password::hash_password(&user.password)?;
     
     // 创建用户
@@ -57,7 +59,18 @@ pub async fn create_user(user: &UserCreate, db: &PgPool) -> AppResult<User> {
     Ok(user)
 }
 
-pub async fn get_user_by_id(id: Uuid, db: &PgPool) -> AppResult<OpenIdUserResponse> {
+// pub async fn get_user_by_id(id: Uuid, db: &PgPool) -> AppResult<OpenIdUserResponse> {
+//     let user = query_as::<_, User>(r#"SELECT * FROM users WHERE id = $1"#)
+//     .bind(id)
+//     .fetch_optional(db)
+//     .await
+//     .map_err(AppError::DatabaseError)?
+//     .ok_or_else(|| AppError::NotFound("用户未找到".to_string()))?;
+    
+//     Ok(OpenIdUserResponse::from(user))
+// }
+
+pub async fn get_self_user_by_id(id: Uuid, db: &PgPool) -> AppResult<SelfUserResponse> {
     let user = query_as::<_, User>(r#"SELECT * FROM users WHERE id = $1"#)
     .bind(id)
     .fetch_optional(db)
@@ -65,9 +78,8 @@ pub async fn get_user_by_id(id: Uuid, db: &PgPool) -> AppResult<OpenIdUserRespon
     .map_err(AppError::DatabaseError)?
     .ok_or_else(|| AppError::NotFound("用户未找到".to_string()))?;
     
-    Ok(OpenIdUserResponse::from(user))
+    Ok(SelfUserResponse::from(user))
 }
-
 /// 获取用户列表，支持分页和搜索
 pub async fn admin_get_user_list(
     offset: i64,
@@ -299,4 +311,183 @@ pub async fn get_recent_login_count(user_id: Uuid, db: &PgPool) -> AppResult<i64
     .get::<i64, _>(0);
     
     Ok(count)
+}
+
+pub async fn get_login_history(
+    user_id: Uuid,
+    start_date: Option<DateTime<Utc>>,
+    end_date: Option<DateTime<Utc>>, 
+    days: i32,
+    db: &PgPool,
+) -> AppResult<LoginHistoryResponse> {
+    // 计算日期范围
+    let now = Utc::now();
+    // 如果没有指定结束日期，则使用当前时间
+    let end = end_date.unwrap_or(now);
+    // 如果指定了开始日期，则使用开始日期；否则根据days计算
+    let start = start_date.unwrap_or_else(|| {
+        now - chrono::Duration::days(days as i64)
+    });
+    
+    // 构建查询，获取登录记录
+    let tokens = query_as::<_, TokenWithClient>(
+        r#"
+        SELECT t.id, t.access_token, t.token_type, t.expires_at, t.created_at, 
+               t.user_id, t.client_id, t.revoked, c.name as client_name
+        FROM tokens t
+        JOIN clients c ON t.client_id = c.id
+        WHERE t.user_id = $1 AND t.created_at BETWEEN $2 AND $3
+        ORDER BY t.created_at DESC
+        "#
+    )
+    .bind(user_id)
+    .bind(start)
+    .bind(end)
+    .fetch_all(db)
+    .await
+    .map_err(AppError::DatabaseError)?;
+    
+    // 统计每个客户端的登录次数和最后登录时间
+    let mut client_stats: HashMap<String, (i32, DateTime<Utc>)> = HashMap::new();
+    for token in &tokens {
+        let client_name = token.client_name.clone();
+        let created_at = token.created_at;
+        
+        if let Some(stats) = client_stats.get_mut(&client_name) {
+            // 增加计数
+            stats.0 += 1;
+            // 更新最后登录时间（如果当前记录更新）
+            if created_at > stats.1 {
+                stats.1 = created_at;
+            }
+        } else {
+            // 第一次看到这个客户端
+            client_stats.insert(client_name, (1, created_at));
+        }
+    }
+    
+    // 将统计转换为向量格式
+    let client_stats_vec: Vec<ClientLoginStat> = client_stats
+        .into_iter()
+        .map(|(name, (count, last_login))| ClientLoginStat { 
+            client_name: name, 
+            login_count: count,
+            last_login: last_login, 
+        })
+        .collect();
+    
+    // 准备返回的响应
+    let response = LoginHistoryResponse {
+        total_logins: tokens.len() as i32,
+        start_date: start,
+        end_date: end,
+        login_records: tokens.into_iter().map(|t| t.into()).collect(),
+        client_stats: client_stats_vec,
+    };
+    
+    Ok(response)
+}
+
+// 用于查询的Token结构体，包含客户端名称
+#[derive(Debug, FromRow)]
+struct TokenWithClient {
+    id: Uuid,
+    #[allow(dead_code)]
+    access_token: String,
+    #[allow(dead_code)]
+    token_type: String,
+    expires_at: DateTime<Utc>,
+    created_at: DateTime<Utc>,
+    #[allow(dead_code)]
+    user_id: Uuid,
+    #[allow(dead_code)]
+    client_id: Uuid,
+    revoked: bool,
+    client_name: String,
+}
+
+impl From<TokenWithClient> for LoginRecord {
+    fn from(token: TokenWithClient) -> Self {
+        LoginRecord {
+            id: token.id,
+            client_name: token.client_name,
+            login_time: token.created_at,
+            expires_at: token.expires_at,
+            is_active: !token.revoked && token.expires_at > Utc::now(),
+        }
+    }
+}
+
+pub async fn get_login_stats(
+    user_id: Uuid,
+    start_date: Option<DateTime<Utc>>,
+    end_date: Option<DateTime<Utc>>, 
+    days: i32,
+    db: &PgPool,
+) -> AppResult<LoginStatsResponse> {
+    // 计算日期范围
+    let now = Utc::now();
+    // 如果没有指定结束日期，则使用当前时间
+    let end = end_date.unwrap_or(now);
+    // 如果指定了开始日期，则使用开始日期；否则根据days计算
+    let start = start_date.unwrap_or_else(|| {
+        now - chrono::Duration::days(days as i64)
+    });
+    
+    // 构建查询，获取统计数据而不是详细记录
+    let tokens = query_as::<_, TokenWithClient>(
+        r#"
+        SELECT t.id, t.access_token, t.token_type, t.expires_at, t.created_at, 
+               t.user_id, t.client_id, t.revoked, c.name as client_name
+        FROM tokens t
+        JOIN clients c ON t.client_id = c.id
+        WHERE t.user_id = $1 AND t.created_at BETWEEN $2 AND $3
+        ORDER BY t.created_at DESC
+        "#
+    )
+    .bind(user_id)
+    .bind(start)
+    .bind(end)
+    .fetch_all(db)
+    .await
+    .map_err(AppError::DatabaseError)?;
+    
+    // 统计每个客户端的登录次数和最后登录时间
+    let mut client_stats: HashMap<String, (i32, DateTime<Utc>)> = HashMap::new();
+    for token in &tokens {
+        let client_name = token.client_name.clone();
+        let created_at = token.created_at;
+        
+        if let Some(stats) = client_stats.get_mut(&client_name) {
+            // 增加计数
+            stats.0 += 1;
+            // 更新最后登录时间（如果当前记录更新）
+            if created_at > stats.1 {
+                stats.1 = created_at;
+            }
+        } else {
+            // 第一次看到这个客户端
+            client_stats.insert(client_name, (1, created_at));
+        }
+    }
+    
+    // 将统计转换为向量格式
+    let client_stats_vec: Vec<ClientLoginStat> = client_stats
+        .into_iter()
+        .map(|(name, (count, last_login))| ClientLoginStat { 
+            client_name: name, 
+            login_count: count,
+            last_login: last_login,
+        })
+        .collect();
+    
+    // 准备返回的响应（只包含统计信息）
+    let response = LoginStatsResponse {
+        total_logins: tokens.len() as i32,
+        start_date: start,
+        end_date: end,
+        client_stats: client_stats_vec,
+    };
+    
+    Ok(response)
 } 
