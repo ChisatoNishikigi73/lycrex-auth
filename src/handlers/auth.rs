@@ -3,7 +3,6 @@ use chrono::Utc;
 use sqlx::{PgPool, query, Row};
 use uuid::Uuid;
 use serde_json::{self, json};
-use url::Url;
 
 use crate::middleware::auth::AuthenticatedUser;
 use crate::models::{AuthorizationRequest, TokenRequest, UserCreate, UserLogin, User, OAuthResponseHandler};

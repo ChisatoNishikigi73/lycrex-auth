@@ -14,7 +14,7 @@ use tera::{Context, Tera};
 struct User {
     #[serde(rename = "id")]
     id: String,
-    #[serde(rename = "username")]
+    #[serde(rename = "preferred_username")]
     username: String,
     #[serde(rename = "email")]
     email: String,
@@ -22,12 +22,18 @@ struct User {
     email_verified: bool,
     #[serde(rename = "avatar_url", default)]
     avatar_url: Option<String>,
+    #[serde(rename = "avatar", default)]
+    avatar: Option<String>,
+    #[serde(rename = "picture", default)]
+    picture: Option<String>,
     #[serde(rename = "created_at")]
     created_at: String,
     #[serde(rename = "last_login_at", default)]
     last_login_at: Option<String>,
     #[serde(rename = "is_active", default = "default_is_active")]
     is_active: bool,
+    #[serde(rename = "recent_login_count", default)]
+    recent_login_count: Option<i64>,
 }
 
 // 默认值函数
@@ -51,7 +57,7 @@ fn get_env_or_default(key: &str, default: &str) -> String {
 // 初始化OAuth配置
 fn init_oauth_config() -> OAuthConfig {
     OAuthConfig {
-        auth_server_url: get_env_or_default("AUTH_SERVER_URL", "http://localhost:8080"),
+        auth_server_url: get_env_or_default("AUTH_SERVER_URL", "http://127.0.0.1:8080"),
         client_id: get_env_or_default("CLIENT_ID", "profile-client"),
         client_secret: get_env_or_default("CLIENT_SECRET", "profile-secret"),
         redirect_uri: get_env_or_default("REDIRECT_URI", "http://localhost:3000/callback"),
@@ -373,12 +379,15 @@ async fn get_user_info(
                     .or_else(|| json_value.get("avatar"))
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string()),
+                avatar: json_value.get("avatar").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                picture: json_value.get("picture").and_then(|v| v.as_str()).map(|s| s.to_string()),
                 created_at: json_value.get("created_at").and_then(|v| v.as_str()).unwrap_or_default().to_string(),
                 last_login_at: json_value.get("last_login_at")
                     .or_else(|| json_value.get("last_login"))
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string()),
                 is_active: json_value.get("is_active").and_then(|v| v.as_bool()).unwrap_or(true),
+                recent_login_count: json_value.get("recent_login_count").and_then(|v| v.as_i64()),
             };
             
             info!("手动解析后的用户信息: {:?}", user);
@@ -426,6 +435,7 @@ async fn main() -> std::io::Result<()> {
             .service(profile)
             .service(logout)
             .service(get_user_info_api)
+            .service(get_recent_clients)
             .service(Files::new("/static", "src/static"))
     })
     .bind((host, port))?

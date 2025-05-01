@@ -183,6 +183,11 @@
         .revoke-btn:hover {
             background-color: #444444;
         }
+        .loading-indicator {
+            text-align: center;
+            color: #aaaaaa;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -223,28 +228,9 @@
             </div>
 
             <div class="card card-tall">
-                <h2 class="card-title">Active Sessions</h2>
-                <div class="sessions-list">
-                    <div class="session-item">
-                        <div class="session-info">
-                            <div class="device-icon">💻</div>
-                            <div>
-                                <div>Desktop App Session</div>
-                                <div class="session-details">Created 1 day ago</div>
-                            </div>
-                        </div>
-                        <button class="revoke-btn">✕ Revoke</button>
-                    </div>
-                    <div class="session-item">
-                        <div class="session-info">
-                            <div class="device-icon">🌐</div>
-                            <div>
-                                <div>Web Session</div>
-                                <div class="session-details">Created 1 day ago</div>
-                            </div>
-                        </div>
-                        <button class="revoke-btn">✕ Revoke</button>
-                    </div>
+                <h2 class="card-title">最近登录的客户端</h2>
+                <div id="recent-clients-list" class="sessions-list">
+                    <div class="loading-indicator">加载中...</div>
                 </div>
             </div>
 
@@ -273,6 +259,7 @@
         // 页面加载完成后获取用户信息
         document.addEventListener('DOMContentLoaded', function() {
             fetchUserInfo();
+            fetchRecentClients(); // 加载最近登录的客户端
         });
 
         // 获取用户信息的函数
@@ -306,8 +293,41 @@
             console.log(user);
             // 更新头像
             const avatarElement = document.getElementById('user-avatar');
-            if (user.avatar) {
-                avatarElement.src = user.avatar;
+            
+            // 优先使用API生成的头像URL
+            if (user.id) {
+                const avatarUrl = generateAvatarUrl(user.id, 100);
+                if (avatarUrl) {
+                    avatarElement.src = avatarUrl;
+                    avatarElement.onerror = function() {
+                        // 如果API URL加载失败，回退到传统方式
+                        useTraditionalAvatarMethod();
+                    };
+                } else {
+                    useTraditionalAvatarMethod();
+                }
+            } else {
+                useTraditionalAvatarMethod();
+            }
+            
+            // 传统方式处理头像
+            function useTraditionalAvatarMethod() {
+                if (user.avatar || user.picture || user.avatar_url) {
+                    const avatarData = user.avatar || user.picture || user.avatar_url;
+                    
+                    // 检查是否是有效的URL
+                    if (avatarData.startsWith('http://') || avatarData.startsWith('https://')) {
+                        avatarElement.src = avatarData;
+                    }
+                    // 检查是否已经是data URI
+                    else if (avatarData.startsWith('data:')) {
+                        avatarElement.src = avatarData;
+                    }
+                    // 如果是纯base64数据
+                    else {
+                        avatarElement.src = `data:image/png;base64,${avatarData}`;
+                    }
+                }
             }
             
             // 根据可能的字段获取用户名
@@ -358,6 +378,116 @@
             
             // 可以添加更多字段的显示，如ID、创建时间、最后登录时间等
             console.log('用户信息:', user);
+        }
+
+        // 生成用户头像URL的函数（使用新API）
+        function generateAvatarUrl(userId, size) {
+            if (!userId) return null;
+            
+            // 使用完整的UUID
+            const fullUuid = userId;
+            
+            // 构建基本URL
+            let url = `/api/service/${fullUuid}/avatar.png`;
+            
+            // 如果指定了尺寸，添加查询参数
+            if (size) {
+                url += `?width=${size}&height=${size}`;
+            }
+            
+            return url;
+        }
+
+        // 获取最近登录的客户端
+        async function fetchRecentClients() {
+            try {
+                const response = await fetch('/api/user/recent-clients');
+                
+                if (!response.ok) {
+                    // 如果响应不成功，处理错误
+                    if (response.status === 401) {
+                        // 未授权，可能需要重新登录
+                        window.location.href = '/';
+                        return;
+                    }
+                    throw new Error('获取最近登录客户端失败');
+                }
+                
+                const clients = await response.json();
+                
+                // 更新UI显示最近登录的客户端
+                displayRecentClients(clients);
+            } catch (error) {
+                console.error('获取最近登录客户端出错:', error);
+                displayRecentClientsError('无法加载最近登录的客户端信息');
+            }
+        }
+        
+        // 显示最近登录的客户端
+        function displayRecentClients(clients) {
+            const container = document.getElementById('recent-clients-list');
+            
+            // 清空加载指示器
+            container.innerHTML = '';
+            
+            if (!clients || clients.length === 0) {
+                container.innerHTML = '<div class="loading-indicator">没有找到最近的登录记录</div>';
+                return;
+            }
+            
+            // 为每个客户端创建一个项目
+            clients.forEach(client => {
+                // 格式化最后登录时间
+                const lastLogin = new Date(client.last_login);
+                const timeAgo = getTimeAgo(lastLogin);
+                
+                // 确定客户端图标
+                let clientIcon = '🔹';
+                const clientType = client.client_type ? client.client_type.toLowerCase() : '';
+                
+                if (clientType.includes('web')) clientIcon = '🌐';
+                else if (clientType.includes('desktop')) clientIcon = '💻';
+                else if (clientType.includes('mobile')) clientIcon = '📱';
+                
+                const clientElement = document.createElement('div');
+                clientElement.className = 'session-item';
+                clientElement.innerHTML = `
+                    <div class="session-info">
+                        <div class="device-icon">${clientIcon}</div>
+                        <div>
+                            <div>${client.client_name}</div>
+                            <div class="session-details">最近登录: ${timeAgo}，共登录 ${client.login_count} 次</div>
+                        </div>
+                    </div>
+                `;
+                
+                container.appendChild(clientElement);
+            });
+        }
+        
+        // 显示最近登录客户端的错误
+        function displayRecentClientsError(message) {
+            const container = document.getElementById('recent-clients-list');
+            container.innerHTML = `<div class="loading-indicator" style="color: #ff8888;">${message}</div>`;
+        }
+        
+        // 计算时间差（几天前、几小时前等）
+        function getTimeAgo(date) {
+            const now = new Date();
+            const diffMs = now - date;
+            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+            const diffMinutes = Math.floor(diffMs / (1000 * 60));
+            
+            if (diffDays > 0) {
+                return `${diffDays} 天前`;
+            } else if (diffHours > 0) {
+                return `${diffHours} 小时前`;
+            } else if (diffMinutes > 0) {
+                return `${diffMinutes} 分钟前`;
+            } else {
+                return '刚刚';
+            }
         }
     </script>
 </body>

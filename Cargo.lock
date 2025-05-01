@@ -1806,6 +1806,7 @@ dependencies = [
  "actix-session",
  "actix-web",
  "anyhow",
+ "base64 0.21.7",
  "bcrypt",
  "chrono",
  "config",

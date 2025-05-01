@@ -26,6 +26,13 @@ pub struct AdminUserResponse {
 // 实现OAuthResponse接口
 impl OAuthResponse for AdminUserResponse {
     fn from_user(user: &User) -> Self {
+        // 从用户的avatar字段生成avatar_url
+        let avatar_url = user.avatar.clone().map(|avatar| {
+            // 如果需要生成URL，可以在此处理
+            // 目前直接返回base64格式
+            format!("data:image/png;base64,{}", avatar)
+        });
+        
         Self {
             sub: user.id.to_string(),
             name: user.username.clone(),
@@ -35,7 +42,7 @@ impl OAuthResponse for AdminUserResponse {
             id: user.id.to_string(),
             login: user.username.clone(),
             username: user.username.clone(),
-            avatar_url: user.avatar_url.clone(),
+            avatar_url,
             created_at: Some(user.created_at),
         }
     }

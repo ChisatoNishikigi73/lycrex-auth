@@ -12,7 +12,7 @@ pub struct User {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub email_verified: bool,
-    pub avatar_url: Option<String>,
+    pub avatar: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

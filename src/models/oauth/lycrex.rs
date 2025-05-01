@@ -35,7 +35,7 @@ impl OAuthResponse for LycrexUserResponse {
             
             // Lycrex特有字段
             id: id_str.clone(),
-            avatar: user.avatar_url.clone(),
+            avatar: user.avatar.clone(),
             lycrex_id: id_str,
             permissions: vec!["user".to_string()],
             created_at: user.created_at.to_rfc3339(),

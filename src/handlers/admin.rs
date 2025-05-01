@@ -63,8 +63,8 @@ pub struct UpdateUserRequest {
     pub username: Option<String>,
     /// 邮箱
     pub email: Option<String>,
-    /// 头像URL
-    pub avatar_url: Option<String>,
+    /// 头像（Base64格式）
+    pub avatar: Option<String>,
 }
 
 /// 更新邮箱验证状态的请求数据结构
@@ -458,7 +458,7 @@ pub async fn update_user(
         user_id,
         data.username.clone(),
         data.email.clone(),
-        data.avatar_url.clone(),
+        data.avatar.clone(),
         &db,
     ).await {
         Ok(user) => {

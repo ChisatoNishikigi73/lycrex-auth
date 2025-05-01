@@ -24,6 +24,13 @@ impl OAuthResponse for GiteaUserResponse {
     fn from_user(user: &User) -> Self {
         let id_str = user.id.to_string();
         
+        // 从用户的avatar字段生成avatar_url
+        let avatar_url = user.avatar.clone().map(|avatar| {
+            // 如果需要生成URL，可以在此处理
+            // 目前直接返回base64格式
+            format!("data:image/png;base64,{}", avatar)
+        });
+        
         Self {
             sub: id_str.clone(),
             name: user.username.clone(),
@@ -35,7 +42,7 @@ impl OAuthResponse for GiteaUserResponse {
             id: id_str,
             login: user.username.clone(),
             username: user.username.clone(),
-            avatar_url: user.avatar_url.clone(),
+            avatar_url,
         }
     }
     

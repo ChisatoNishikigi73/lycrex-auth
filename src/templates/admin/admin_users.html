@@ -272,8 +272,11 @@
                 </div>
                 
                 <div>
-                    <label for="edit-avatar-url">头像URL</label>
-                    <input type="text" id="edit-avatar-url" name="edit-avatar-url" placeholder="头像URL">
+                    <label for="edit-avatar">头像图片</label>
+                    <input type="file" id="edit-avatar" name="edit-avatar" accept="image/*">
+                    <div id="avatar-preview-container" style="margin-top: 10px; text-align: center; display: none;">
+                        <img id="avatar-preview" style="max-width: 100px; max-height: 100px; border-radius: 50%;">
+                    </div>
                 </div>
                 
                 <button type="submit">保存修改</button>
@@ -288,6 +291,7 @@
             let pageSize = 10;
             let totalUsers = 0;
             let searchQuery = '';
+            let currentAvatarBase64 = null;
             
             // 切换标签页
             const userListTab = document.getElementById('user-list-tab');
@@ -325,6 +329,32 @@
                     searchQuery = searchInput.value.trim();
                     currentPage = 1;
                     loadUsers();
+                }
+            });
+            
+            // 处理头像文件上传和预览
+            const avatarInput = document.getElementById('edit-avatar');
+            const avatarPreview = document.getElementById('avatar-preview');
+            const avatarPreviewContainer = document.getElementById('avatar-preview-container');
+            
+            avatarInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    // 使用FileReader读取文件
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        // 显示预览（使用完整的data URL）
+                        avatarPreview.src = e.target.result;
+                        avatarPreviewContainer.style.display = 'block';
+                        
+                        // 存储base64数据(完整data URL，在提交表单时会提取纯base64部分)
+                        currentAvatarBase64 = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    // 如果没有选择文件，隐藏预览
+                    avatarPreviewContainer.style.display = 'none';
+                    currentAvatarBase64 = null;
                 }
             });
             
@@ -392,13 +422,16 @@
                         ? `<span class="badge badge-success">已验证</span>` 
                         : `<span class="badge badge-warning">未验证</span>`;
                     
+                    // 通过avatar_url字段或avatar字段获取头像（兼容旧版本）
+                    const avatarData = user.avatar || user.avatar_url || '';
+                    
                     row.innerHTML = `
                         <td>${user.username}</td>
                         <td>${user.email}</td>
                         <td>${verifiedBadge}</td>
                         <td>${formattedDate}</td>
                         <td class="actions">
-                            <button class="edit-btn" data-id="${user.id}" data-username="${user.username}" data-email="${user.email}" data-avatar="${user.avatar_url || ''}">编辑</button>
+                            <button class="edit-btn" data-id="${user.id}" data-username="${user.username}" data-email="${user.email}" data-avatar="${avatarData}">编辑</button>
                             <button class="verify-btn" data-id="${user.id}" data-verified="${user.email_verified}">
                                 ${user.email_verified ? '取消验证' : '验证邮箱'}
                             </button>
@@ -421,7 +454,26 @@
                         document.getElementById('edit-id').value = userId;
                         document.getElementById('edit-username').value = username;
                         document.getElementById('edit-email').value = email;
-                        document.getElementById('edit-avatar-url').value = avatar;
+                        
+                        // 重置头像上传
+                        document.getElementById('edit-avatar').value = '';
+                        
+                        // 检查avatar是否已经包含data:前缀
+                        if (avatar) {
+                            currentAvatarBase64 = avatar;
+                            // 如果avatar已经是data URI，直接使用
+                            if (avatar.startsWith('data:')) {
+                                avatarPreview.src = avatar;
+                            } 
+                            // 如果avatar是纯base64，添加前缀
+                            else {
+                                avatarPreview.src = `data:image/png;base64,${avatar}`;
+                            }
+                            avatarPreviewContainer.style.display = 'block';
+                        } else {
+                            avatarPreviewContainer.style.display = 'none';
+                            currentAvatarBase64 = null;
+                        }
                         
                         // 显示模态框
                         document.getElementById('edit-modal').style.display = 'block';
@@ -639,13 +691,18 @@
                 const username = document.getElementById('edit-username').value;
                 const email = document.getElementById('edit-email').value;
                 const password = document.getElementById('edit-password').value;
-                const avatarUrl = document.getElementById('edit-avatar-url').value;
+                
+                // 确保avatar数据不包含前缀
+                let avatarData = currentAvatarBase64;
+                if (avatarData && avatarData.startsWith('data:')) {
+                    avatarData = avatarData.split(',')[1];
+                }
                 
                 // 构建提交数据对象
                 const userData = {
                     username,
                     email,
-                    avatar_url: avatarUrl || null
+                    avatar: avatarData
                 };
                 
                 // 只有当密码字段有值时才添加到请求数据中

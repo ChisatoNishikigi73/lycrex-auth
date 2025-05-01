@@ -3,6 +3,7 @@ mod clients;
 mod users;
 mod pages;
 mod admin;
+mod service;
 
 use actix_web::web;
 use crate::utils::static_files::serve_static_file;
@@ -17,6 +18,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .configure(auth::configure_routes)
             .configure(clients::configure_routes)
             .configure(users::configure_routes)
+            .configure(service::configure_routes)
     );
     
     // 管理员路由

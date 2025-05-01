@@ -44,7 +44,7 @@ impl OAuthResponse for CasdoorUserResponse {
             // Casdoor特有字段的默认值
             id: id_str,
             owner: Some("lycrex".to_string()),
-            avatar: user.avatar_url.clone(),
+            avatar: user.avatar.clone(),
             phone: None,
             address: None,
             affiliation: None,
