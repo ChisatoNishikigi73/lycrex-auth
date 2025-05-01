@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+use crate::models::User;
+use crate::models::oauth::interface::OAuthResponse;
+use uuid;
+use sqlx;
 
 /// Casdoor OAuth用户响应结构体
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,9 +29,9 @@ pub struct CasdoorUserResponse {
     pub signin_provider: Option<String>,
 }
 
-/// 从我们的用户模型转换为Casdoor兼容的响应
-impl From<crate::models::User> for CasdoorUserResponse {
-    fn from(user: crate::models::User) -> Self {
+// 实现OAuthResponse接口
+impl OAuthResponse for CasdoorUserResponse {
+    fn from_user(user: &User) -> Self {
         let id_str = user.id.to_string();
         
         Self {
@@ -41,7 +44,7 @@ impl From<crate::models::User> for CasdoorUserResponse {
             // Casdoor特有字段的默认值
             id: id_str,
             owner: Some("lycrex".to_string()),
-            avatar: user.avatar_url,
+            avatar: user.avatar_url.clone(),
             phone: None,
             address: None,
             affiliation: None,
@@ -52,6 +55,59 @@ impl From<crate::models::User> for CasdoorUserResponse {
             is_forbidden: None,
             signin_provider: Some("lycrex".to_string()),
         }
+    }
+    
+    fn get_id_str(&self) -> String {
+        self.id.clone()
+    }
+    
+    // 增加一个后处理方法，设置一些额外的字段
+    async fn post_process(mut self, user_id: &uuid::Uuid, db: &sqlx::PgPool) -> Result<Self, String> {
+        // 使用User结构体查询用户信息
+        match sqlx::query_as::<_, crate::models::User>("SELECT * FROM users WHERE id = $1")
+            .bind(user_id)
+            .fetch_optional(db)
+            .await
+        {
+            Ok(Some(user)) => {
+                // 根据一定规则判断是否为管理员 (例如特定的邮箱后缀)
+                let is_admin = user.email.ends_with("@admin.lycrex.com") || 
+                               user.username == "admin" ||
+                               user.email == "admin@example.com";
+                
+                self.is_admin = Some(is_admin);
+                self.is_global_admin = Some(is_admin);
+                
+                // 设置电话号码字段（如果有相关信息）
+                self.phone = Some("未设置".to_string());
+                
+                // 如果是管理员，还可以设置一些特殊标签
+                if is_admin {
+                    self.tag = Some("admin".to_string());
+                    self.score = Some(100); // 管理员得分更高
+                } else {
+                    self.tag = Some("user".to_string());
+                    self.score = Some(10);  // 普通用户得分
+                }
+                
+                Ok(self)
+            },
+            Ok(None) => {
+                log::warn!("用户 {} 未找到，使用默认的Casdoor响应", user_id);
+                Ok(self)
+            },
+            Err(e) => {
+                log::warn!("查询用户 {} 信息失败: {}", user_id, e);
+                Ok(self) // 返回原始响应
+            }
+        }
+    }
+}
+
+/// 从我们的用户模型转换为Casdoor兼容的响应 (保持向后兼容)
+impl From<User> for CasdoorUserResponse {
+    fn from(user: User) -> Self {
+        Self::from_user(&user)
     }
 }
 

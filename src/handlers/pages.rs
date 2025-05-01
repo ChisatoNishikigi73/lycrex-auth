@@ -1,5 +1,7 @@
 use actix_web::{web, HttpResponse, Responder};
 use serde::Deserialize;
+use uuid::Uuid;
+use sqlx::PgPool;
 
 #[derive(Deserialize)]
 pub struct LoginQuery {
@@ -16,6 +18,7 @@ pub struct LoginQuery {
 pub async fn login_page(
     query: web::Query<LoginQuery>,
     session: actix_session::Session,
+    db: web::Data<PgPool>,
 ) -> impl Responder {
     // 检查是否提供了client_id
     if query.client_id.is_none() || query.client_id.as_deref().unwrap_or("").is_empty() {
@@ -29,8 +32,23 @@ pub async fn login_page(
     // 检查当前会话
     let login_status = match session.get::<String>("user_id") {
         Ok(Some(user_id)) => {
-            log::info!("用户已登录，用户ID: {}", user_id);
-            format!("用户 {} 已登录", user_id)
+            // 尝试从数据库获取用户名
+            let username = match Uuid::parse_str(&user_id) {
+                Ok(uuid) => {
+                    match crate::services::user::find_user_by_id(uuid, &db).await {
+                        Ok(Some(user)) => user.username,
+                        Ok(None) => user_id.clone(),
+                        Err(err) => {
+                            log::error!("查询用户信息失败: {}", err);
+                            user_id.clone()
+                        }
+                    }
+                },
+                Err(_) => user_id.clone()
+            };
+            
+            log::info!("用户已登录，用户ID: {}, 用户名: {}", user_id, username);
+            format!("用户 {} 已登录", username)
         },
         _ => {
             log::info!("用户未登录，显示登录页面");
@@ -96,6 +114,7 @@ pub async fn index_page(_session: actix_session::Session) -> impl Responder {
 pub async fn welcome_page(
     query: web::Query<LoginQuery>,
     session: actix_session::Session,
+    db: web::Data<PgPool>,
 ) -> impl Responder {
     // 检查是否提供了client_id和redirect_uri
     if query.client_id.is_none() || query.redirect_uri.is_none() {
@@ -109,14 +128,43 @@ pub async fn welcome_page(
     // 从会话或参数中获取用户信息
     let username = match session.get::<String>("user_id") {
         Ok(Some(user_id)) => {
-            // 理想情况下，应该使用user_id查询数据库获取用户名
-            // 这里简化处理，使用query参数中的用户名或默认值
-            query.username.as_deref().unwrap_or("用户").to_string()
+            // 尝试将user_id解析为UUID并从数据库查询用户名
+            match Uuid::parse_str(&user_id) {
+                Ok(uuid) => {
+                    match crate::services::user::find_user_by_id(uuid, &db).await {
+                        Ok(Some(user)) => user.username,
+                        Ok(None) => {
+                            log::warn!("在数据库中未找到用户ID: {}", user_id);
+                            query.username.as_deref().unwrap_or("用户").to_string()
+                        },
+                        Err(err) => {
+                            log::error!("查询用户信息失败: {}", err);
+                            query.username.as_deref().unwrap_or("用户").to_string()
+                        }
+                    }
+                },
+                Err(err) => {
+                    log::warn!("会话中的用户ID不是有效的UUID格式: {}, 错误: {}", user_id, err);
+                    query.username.as_deref().unwrap_or("用户").to_string()
+                }
+            }
         },
         _ => {
             // 如果会话中没有，尝试从query中获取
             if let Some(user_id) = &query.user_id {
-                query.username.as_deref().unwrap_or("用户").to_string()
+                match Uuid::parse_str(user_id) {
+                    Ok(uuid) => {
+                        match crate::services::user::find_user_by_id(uuid, &db).await {
+                            Ok(Some(user)) => user.username,
+                            Ok(None) => query.username.as_deref().unwrap_or("用户").to_string(),
+                            Err(err) => {
+                                log::error!("查询用户信息失败: {}", err);
+                                query.username.as_deref().unwrap_or("用户").to_string()
+                            }
+                        }
+                    },
+                    Err(_) => query.username.as_deref().unwrap_or("用户").to_string()
+                }
             } else {
                 // 没有用户ID，重定向到登录页面
                 log::warn!("欢迎页面无法获取用户ID，重定向到登录页面");

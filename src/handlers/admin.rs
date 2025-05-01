@@ -102,6 +102,50 @@ fn is_admin_authenticated(session: &Session) -> bool {
     }
 }
 
+/// 构建未登录错误响应
+fn unauthorized_response() -> HttpResponse {
+    log::warn!("未登录访问管理员接口");
+    HttpResponse::Unauthorized()
+        .content_type("application/json")
+        .json(serde_json::json!({ "error": "未登录或会话已过期，请重新登录" }))
+}
+
+/// 构建服务器错误响应
+fn server_error_response(err: &str) -> HttpResponse {
+    HttpResponse::InternalServerError()
+        .content_type("application/json")
+        .json(serde_json::json!({ "error": err }))
+}
+
+/// 构建客户端错误响应
+fn client_error_response(err: &str) -> HttpResponse {
+    HttpResponse::BadRequest()
+        .content_type("application/json")
+        .json(serde_json::json!({ "error": err }))
+}
+
+/// 构建成功响应
+fn success_response<T: serde::Serialize>(data: T) -> HttpResponse {
+    HttpResponse::Ok()
+        .content_type("application/json")
+        .json(data)
+}
+
+/// 构建创建成功响应
+fn created_response<T: serde::Serialize>(data: T) -> HttpResponse {
+    HttpResponse::Created()
+        .content_type("application/json")
+        .json(data)
+}
+
+/// 验证管理员权限中间件
+fn validate_admin_auth(session: &Session) -> Result<(), HttpResponse> {
+    if !is_admin_authenticated(session) {
+        return Err(unauthorized_response());
+    }
+    Ok(())
+}
+
 /// 显示管理员登录页面
 pub async fn admin_login_page() -> impl Responder {
     log::info!("显示管理员登录页面");
@@ -120,20 +164,14 @@ pub async fn admin_login(
         // 设置会话标记
         if let Err(e) = session.insert(ADMIN_SESSION_KEY, true) {
             log::error!("设置管理员会话失败: {}", e);
-            return HttpResponse::InternalServerError()
-                .content_type("application/json")
-                .json(serde_json::json!({
-                    "error": "设置会话失败，请稍后重试"
-                }));
+            return server_error_response("设置会话失败，请稍后重试");
         }
         
         log::info!("管理员登录成功");
-        HttpResponse::Ok()
-            .content_type("application/json")
-            .json(serde_json::json!({
-                "success": true,
-                "message": "登录成功"
-            }))
+        success_response(serde_json::json!({
+            "success": true,
+            "message": "登录成功"
+        }))
     } else {
         log::warn!("管理员登录失败：密码不正确");
         HttpResponse::Unauthorized()
@@ -198,11 +236,8 @@ pub async fn create_provider(
     session: Session,
 ) -> impl Responder {
     // 验证管理员是否已登录
-    if !is_admin_authenticated(&session) {
-        log::warn!("未登录尝试创建提供方");
-        return HttpResponse::Unauthorized()
-            .content_type("application/json")
-            .json(serde_json::json!({ "error": "未登录或会话已过期，请重新登录" }));
+    if let Err(response) = validate_admin_auth(&session) {
+        return response;
     }
     
     // 创建客户端对象
@@ -224,15 +259,11 @@ pub async fn create_provider(
     ).await {
         Ok(client) => {
             log::info!("提供方创建成功：{}", client.name);
-            HttpResponse::Created()
-                .content_type("application/json")
-                .json(client)
+            created_response(client)
         },
         Err(err) => {
             log::warn!("创建提供方失败：{}", err);
-            HttpResponse::BadRequest()
-                .content_type("application/json")
-                .json(serde_json::json!({ "error": err.to_string() }))
+            client_error_response(&err.to_string())
         },
     }
 }
@@ -243,33 +274,19 @@ pub async fn get_providers(
     session: Session,
 ) -> impl Responder {
     // 验证管理员是否已登录
-    if !is_admin_authenticated(&session) {
-        log::warn!("未登录尝试获取提供方列表");
-        return HttpResponse::Unauthorized()
-            .content_type("application/json")
-            .json(serde_json::json!({ "error": "未登录或会话已过期，请重新登录" }));
+    if let Err(response) = validate_admin_auth(&session) {
+        return response;
     }
     
     // 尝试获取所有客户端
-    let result = client_service::get_all_clients(&db).await;
-    
-    match result {
+    match client_service::get_all_clients(&db).await {
         Ok(clients) => {
-            log::info!("获取提供方列表，共{}个", clients.len());
-            // 返回JSON数组
-            HttpResponse::Ok()
-                .content_type("application/json")
-                .json(clients)
+            log::info!("获取提供方列表成功，共{}个提供方", clients.len());
+            success_response(clients)
         },
         Err(err) => {
-            // 记录错误
             log::error!("获取提供方列表失败：{}", err);
-            // 返回错误JSON
-            HttpResponse::InternalServerError()
-                .content_type("application/json")
-                .json(serde_json::json!({
-                    "error": format!("获取提供方列表失败: {}", err)
-                }))
+            server_error_response(&format!("获取提供方列表失败: {}", err))
         },
     }
 }
@@ -281,26 +298,19 @@ pub async fn delete_provider(
     session: Session,
 ) -> impl Responder {
     // 验证管理员是否已登录
-    if !is_admin_authenticated(&session) {
-        log::warn!("未登录尝试删除提供方");
-        return HttpResponse::Unauthorized()
-            .content_type("application/json")
-            .json(serde_json::json!({ "error": "未登录或会话已过期，请重新登录" }));
+    if let Err(response) = validate_admin_auth(&session) {
+        return response;
     }
     
     let client_id = path.into_inner();
     match client_service::delete_client(client_id, &db).await {
         Ok(_) => {
             log::info!("提供方删除成功，ID: {}", client_id);
-            HttpResponse::Ok()
-                .content_type("application/json")
-                .json(serde_json::json!({ "success": true }))
+            success_response(serde_json::json!({ "success": true }))
         },
         Err(err) => {
             log::warn!("删除提供方失败：{}", err);
-            HttpResponse::BadRequest()
-                .content_type("application/json")
-                .json(serde_json::json!({ "error": err.to_string() }))
+            client_error_response(&err.to_string())
         },
     }
 }
@@ -313,62 +323,48 @@ pub async fn update_provider(
     session: Session,
 ) -> impl Responder {
     // 验证管理员是否已登录
-    if !is_admin_authenticated(&session) {
-        log::warn!("未登录尝试更新提供方");
-        return HttpResponse::Unauthorized()
-            .content_type("application/json")
-            .json(serde_json::json!({ "error": "未登录或会话已过期，请重新登录" }));
+    if let Err(response) = validate_admin_auth(&session) {
+        return response;
     }
     
     let client_id = path.into_inner();
     
     // 首先尝试更新基本信息
-    let update_result = client_service::update_client(
+    match client_service::update_client(
         client_id,
         data.name.clone(),
         data.redirect_uris.clone(),
         None, // 不更新allowed_scopes
         data.client_type.clone(),
         &db
-    ).await;
-    
-    // 如果基本信息更新成功且有需要更新客户端ID或密钥
-    if let Ok(mut client) = update_result {
-        // 检查是否需要更新客户端ID或密钥
-        if data.client_id.is_some() || data.client_secret.is_some() {
-            match client_service::update_client_credentials(
-                client_id,
-                data.client_id.clone(),
-                data.client_secret.clone(),
-                &db
-            ).await {
-                Ok(updated) => {
-                    client = updated;
-                    log::info!("提供方凭据更新成功，ID: {}", client_id);
-                },
-                Err(err) => {
-                    log::warn!("更新提供方凭据失败：{}", err);
-                    return HttpResponse::BadRequest()
-                        .content_type("application/json")
-                        .json(serde_json::json!({ "error": format!("更新凭据失败: {}", err.to_string()) }));
+    ).await {
+        Ok(mut client) => {
+            // 检查是否需要更新客户端ID或密钥
+            if data.client_id.is_some() || data.client_secret.is_some() {
+                match client_service::update_client_credentials(
+                    client_id,
+                    data.client_id.clone(),
+                    data.client_secret.clone(),
+                    &db
+                ).await {
+                    Ok(updated) => {
+                        client = updated;
+                        log::info!("提供方凭据更新成功，ID: {}", client_id);
+                    },
+                    Err(err) => {
+                        log::warn!("更新提供方凭据失败：{}", err);
+                        return client_error_response(&format!("更新凭据失败: {}", err));
+                    }
                 }
             }
-        }
-        
-        log::info!("提供方更新成功，ID: {}", client_id);
-        HttpResponse::Ok()
-            .content_type("application/json")
-            .json(client)
-    } else if let Err(err) = update_result {
-        log::warn!("更新提供方失败：{}", err);
-        HttpResponse::BadRequest()
-            .content_type("application/json")
-            .json(serde_json::json!({ "error": err.to_string() }))
-    } else {
-        // 这种情况理论上不会发生，但为了安全起见
-        HttpResponse::InternalServerError()
-            .content_type("application/json")
-            .json(serde_json::json!({ "error": "更新提供方时发生未知错误" }))
+            
+            log::info!("提供方更新成功，ID: {}", client_id);
+            success_response(client)
+        },
+        Err(err) => {
+            log::warn!("更新提供方失败：{}", err);
+            client_error_response(&err.to_string())
+        },
     }
 }
 
@@ -379,11 +375,8 @@ pub async fn get_users(
     session: Session,
 ) -> impl Responder {
     // 验证管理员是否已登录
-    if !is_admin_authenticated(&session) {
-        log::warn!("未登录尝试获取用户列表");
-        return HttpResponse::Unauthorized()
-            .content_type("application/json")
-            .json(serde_json::json!({ "error": "未登录或会话已过期，请重新登录" }));
+    if let Err(response) = validate_admin_auth(&session) {
+        return response;
     }
     
     // 处理分页参数
@@ -392,31 +385,24 @@ pub async fn get_users(
     let offset = (page - 1) * limit;
     
     // 执行查询
-    let result = user_service::admin_get_user_list(
+    match user_service::admin_get_user_list(
         offset as i64, 
         limit as i64, 
         query.search.as_deref(),
         &db
-    ).await;
-    
-    match result {
+    ).await {
         Ok((users, total)) => {
-            log::info!("获取用户列表，共{}个", users.len());
-            // 返回JSON响应
-            HttpResponse::Ok()
-                .content_type("application/json")
-                .json(serde_json::json!({
-                    "users": users,
-                    "total": total,
-                    "page": page,
-                    "limit": limit
-                }))
+            log::info!("获取用户列表成功，共{}个用户", users.len());
+            success_response(serde_json::json!({
+                "users": users,
+                "total": total,
+                "page": page,
+                "limit": limit
+            }))
         },
         Err(err) => {
             log::error!("获取用户列表失败：{}", err);
-            HttpResponse::InternalServerError()
-                .content_type("application/json")
-                .json(serde_json::json!({ "error": err.to_string() }))
+            server_error_response(&err.to_string())
         },
     }
 }
@@ -428,11 +414,8 @@ pub async fn create_user(
     session: Session,
 ) -> impl Responder {
     // 验证管理员是否已登录
-    if !is_admin_authenticated(&session) {
-        log::warn!("未登录尝试创建用户");
-        return HttpResponse::Unauthorized()
-            .content_type("application/json")
-            .json(serde_json::json!({ "error": "未登录或会话已过期，请重新登录" }));
+    if let Err(response) = validate_admin_auth(&session) {
+        return response;
     }
     
     // 创建用户对象
@@ -447,15 +430,11 @@ pub async fn create_user(
         Ok(user) => {
             log::info!("用户创建成功，ID: {}", user.id);
             let user_response = crate::models::OpenIdUserResponse::from(user);
-            HttpResponse::Created()
-                .content_type("application/json")
-                .json(user_response)
+            created_response(user_response)
         },
         Err(err) => {
             log::error!("创建用户失败：{}", err);
-            HttpResponse::BadRequest()
-                .content_type("application/json")
-                .json(serde_json::json!({ "error": err.to_string() }))
+            client_error_response(&err.to_string())
         },
     }
 }
@@ -468,11 +447,8 @@ pub async fn update_user(
     session: Session,
 ) -> impl Responder {
     // 验证管理员是否已登录
-    if !is_admin_authenticated(&session) {
-        log::warn!("未登录尝试更新用户");
-        return HttpResponse::Unauthorized()
-            .content_type("application/json")
-            .json(serde_json::json!({ "error": "未登录或会话已过期，请重新登录" }));
+    if let Err(response) = validate_admin_auth(&session) {
+        return response;
     }
     
     let user_id = path.into_inner();
@@ -487,15 +463,11 @@ pub async fn update_user(
     ).await {
         Ok(user) => {
             log::info!("用户更新成功，ID: {}", user_id);
-            HttpResponse::Ok()
-                .content_type("application/json")
-                .json(user)
+            success_response(user)
         },
         Err(err) => {
             log::error!("更新用户失败：{}", err);
-            HttpResponse::BadRequest()
-                .content_type("application/json")
-                .json(serde_json::json!({ "error": err.to_string() }))
+            client_error_response(&err.to_string())
         },
     }
 }
@@ -507,11 +479,8 @@ pub async fn delete_user(
     session: Session,
 ) -> impl Responder {
     // 验证管理员是否已登录
-    if !is_admin_authenticated(&session) {
-        log::warn!("未登录尝试删除用户");
-        return HttpResponse::Unauthorized()
-            .content_type("application/json")
-            .json(serde_json::json!({ "error": "未登录或会话已过期，请重新登录" }));
+    if let Err(response) = validate_admin_auth(&session) {
+        return response;
     }
     
     let user_id = path.into_inner();
@@ -520,15 +489,11 @@ pub async fn delete_user(
     match user_service::delete_user(user_id, &db).await {
         Ok(_) => {
             log::info!("用户删除成功，ID: {}", user_id);
-            HttpResponse::Ok()
-                .content_type("application/json")
-                .json(serde_json::json!({ "success": true }))
+            success_response(serde_json::json!({ "success": true }))
         },
         Err(err) => {
             log::error!("删除用户失败：{}", err);
-            HttpResponse::BadRequest()
-                .content_type("application/json")
-                .json(serde_json::json!({ "error": err.to_string() }))
+            client_error_response(&err.to_string())
         },
     }
 }
@@ -541,11 +506,8 @@ pub async fn toggle_user_email_verification(
     session: Session,
 ) -> impl Responder {
     // 验证管理员是否已登录
-    if !is_admin_authenticated(&session) {
-        log::warn!("未登录尝试切换用户邮箱验证状态");
-        return HttpResponse::Unauthorized()
-            .content_type("application/json")
-            .json(serde_json::json!({ "error": "未登录或会话已过期，请重新登录" }));
+    if let Err(response) = validate_admin_auth(&session) {
+        return response;
     }
     
     let user_id = path.into_inner();
@@ -558,15 +520,11 @@ pub async fn toggle_user_email_verification(
                 user_id, 
                 if data.email_verified { "已验证" } else { "未验证" }
             );
-            HttpResponse::Ok()
-                .content_type("application/json")
-                .json(user)
+            success_response(user)
         },
         Err(err) => {
             log::error!("修改用户邮箱验证状态失败：{}", err);
-            HttpResponse::BadRequest()
-                .content_type("application/json")
-                .json(serde_json::json!({ "error": err.to_string() }))
+            client_error_response(&err.to_string())
         },
     }
 } 

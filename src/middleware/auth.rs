@@ -6,10 +6,21 @@ use actix_web::{
     Error, HttpMessage,
 };
 use futures::Future;
+use jsonwebtoken::TokenData;
 use uuid::Uuid;
 
 use crate::errors::AppError;
 use crate::utils::jwt;
+use crate::models::TokenClaims;
+
+// 常量定义
+const AUTH_HEADER: &str = "Authorization";
+const BEARER_PREFIX: &str = "Bearer ";
+
+// 错误消息常量
+const ERR_NO_TOKEN: &str = "未提供认证令牌";
+const ERR_INVALID_HEADER: &str = "无效的认证头";
+const ERR_INVALID_FORMAT: &str = "无效的认证令牌格式";
 
 // 定义认证中间件
 pub struct Auth;
@@ -56,68 +67,78 @@ where
     forward_ready!(service);
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
-        // 获取请求的所有头部信息并记录
-        let headers = req.headers();
-        let mut headers_str = String::new();
-        for (key, value) in headers.iter() {
-            if let Ok(v) = value.to_str() {
-                headers_str.push_str(&format!("{}: {}, ", key, v));
-            }
-        }
-        log::info!("认证中间件请求头: {}", headers_str);
-        log::info!("认证中间件请求路径: {}, 方法: {}", req.path(), req.method());
+        log_request_info(&req);
         
-        // 从请求头中获取authorization
-        let auth_header = req.headers().get("Authorization");
+        // 从请求头中获取并验证token
+        let token_result = extract_and_validate_token(&req);
         
-        if auth_header.is_none() {
-            log::error!("未提供认证令牌，路径：{}", req.path());
-            let err = AppError::Unauthorized("未提供认证令牌".to_string());
-            return Box::pin(async { Err(err.into()) });
-        }
-        
-        let auth_header = match auth_header.unwrap().to_str() {
-            Ok(header) => header,
-            Err(e) => {
-                log::error!("无法读取认证头: {}", e);
-                let err = AppError::Unauthorized("无效的认证头".to_string());
-                return Box::pin(async { Err(err.into()) });
-            }
-        };
-        
-        // 验证Bearer令牌
-        if !auth_header.starts_with("Bearer ") {
-            log::error!("无效的认证令牌格式: {}", auth_header);
-            let err = AppError::Unauthorized("无效的认证令牌格式".to_string());
-            return Box::pin(async { Err(err.into()) });
-        }
-        
-        let token = auth_header[7..].to_string();
-        log::info!("处理Token验证请求: {}, 令牌: {}", req.path(), token);
-        
-        // 只验证JWT令牌，不查询数据库
-        let token_data = match jwt::verify_token(&token) {
-            Ok(data) => {
-                log::info!("令牌验证成功，用户ID: {}", data.claims.sub);
-                data
+        match token_result {
+            Ok(token_data) => {
+                // 将用户ID添加到请求扩展中
+                req.extensions_mut().insert(AuthenticatedUser {
+                    user_id: token_data.claims.sub,
+                });
+                
+                // 继续处理请求
+                let fut = self.service.call(req);
+                Box::pin(async move {
+                    let res = fut.await?;
+                    Ok(res)
+                })
             },
-            Err(e) => {
-                log::error!("无效的认证令牌: {}", e);
-                let err = AppError::Unauthorized(format!("无效的认证令牌: {}", e));
-                return Box::pin(async { Err(err.into()) });
-            }
-        };
-        
-        // 将用户ID添加到请求扩展中
-        req.extensions_mut().insert(AuthenticatedUser {
-            user_id: token_data.claims.sub,
-        });
-        
-        let fut = self.service.call(req);
-        
-        Box::pin(async move {
-            let res = fut.await?;
-            Ok(res)
-        })
+            Err(err) => Box::pin(async { Err(err.into()) }),
+        }
     }
+}
+
+// 辅助函数：记录请求信息
+fn log_request_info(req: &ServiceRequest) {
+    let headers = req.headers();
+    let mut headers_str = String::new();
+    
+    for (key, value) in headers.iter() {
+        if let Ok(v) = value.to_str() {
+            headers_str.push_str(&format!("{}: {}, ", key, v));
+        }
+    }
+    
+    log::info!(
+        "认证中间件 | 路径: {} | 方法: {} | 请求头: {}", 
+        req.path(), 
+        req.method(), 
+        headers_str
+    );
+}
+
+// 辅助函数：提取和验证token
+fn extract_and_validate_token(req: &ServiceRequest) -> Result<TokenData<TokenClaims>, AppError> {
+    // 获取认证头
+    let auth_header = req.headers()
+        .get(AUTH_HEADER)
+        .ok_or_else(|| {
+            log::error!("认证失败 | 原因: {} | 路径: {}", ERR_NO_TOKEN, req.path());
+            AppError::Unauthorized(ERR_NO_TOKEN.to_string())
+        })?;
+    
+    // 转换认证头为字符串
+    let auth_str = auth_header.to_str().map_err(|e| {
+        log::error!("认证失败 | 原因: {} | 详情: {}", ERR_INVALID_HEADER, e);
+        AppError::Unauthorized(ERR_INVALID_HEADER.to_string())
+    })?;
+    
+    // 验证Bearer前缀
+    if !auth_str.starts_with(BEARER_PREFIX) {
+        log::error!("认证失败 | 原因: {} | 收到: {}", ERR_INVALID_FORMAT, auth_str);
+        return Err(AppError::Unauthorized(ERR_INVALID_FORMAT.to_string()));
+    }
+    
+    // 提取token
+    let token = &auth_str[BEARER_PREFIX.len()..];
+    log::info!("处理Token验证 | 路径: {} | 令牌: {}", req.path(), token);
+    
+    // 验证JWT令牌
+    jwt::verify_token(token).map_err(|e| {
+        log::error!("认证失败 | 原因: 无效的令牌 | 详情: {}", e);
+        AppError::Unauthorized(format!("无效的认证令牌: {}", e))
+    })
 } 

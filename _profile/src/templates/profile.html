@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile</title>
+    <style>
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background-color: #000000;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+        }
+        .profile-container {
+            max-width: 1200px;
+            margin: 40px auto;
+        }
+        h1.page-title {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        .page-description {
+            color: #cccccc;
+            margin-bottom: 40px;
+        }
+        .cards-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        .card {
+            background-color: #111111;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.3);
+            border: 1px solid #333333;
+        }
+        .card-full {
+            grid-column: 1 / -1;
+        }
+        .card-tall {
+            grid-row: span 2;
+        }
+        .card-title {
+            font-size: 33px;
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-right: 20px;
+            background-color: #333333;
+        }
+        .user-name {
+            font-size: 20px;
+            font-weight: bold;
+            margin: 0 0 5px 0;
+        }
+        .user-email {
+            color: #aaaaaa;
+            margin: 0;
+        }
+        .info-item {
+            display: flex;
+            margin-bottom: 12px;
+            align-items: center;
+        }
+        .info-label {
+            min-width: 150px;
+            color: #ffffff;
+            text-align: left;
+            font-weight: bold;
+        }
+        .info-value {
+            flex: 1;
+            color: #ffffff;
+            text-align: right;
+        }
+        .progress-bar {
+            height: 8px;
+            background-color: #222222;
+            border-radius: 4px;
+            margin-top: 5px;
+            margin-bottom: 10px;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #4caf50;
+            border-radius: 4px;
+            width: 10%;
+        }
+        .usage-details {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            color: #aaaaaa;
+        }
+        .btn {
+            display: inline-block;
+            background-color: #222222;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: bold;
+            border: none;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        .btn:hover {
+            background-color: #333333;
+        }
+        .btn-primary {
+            background-color: #ffffff;
+            color: #000000;
+        }
+        .btn-primary:hover {
+            background-color: #dddddd;
+        }
+        .verified-badge {
+            display: inline-block;
+            background-color: #4caf50;
+            color: white;
+            font-size: 12px;
+            padding: 3px 8px;
+            border-radius: 10px;
+            margin-right: 10px;
+        }
+        .not-verified-badge {
+            display: inline-block;
+            background-color: #ff9800;
+            color: white;
+            font-size: 12px;
+            padding: 3px 8px;
+            border-radius: 10px;
+            margin-right: 10px;
+        }
+        .sessions-list {
+            margin-top: 20px;
+        }
+        .session-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #222222;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .session-info {
+            display: flex;
+            align-items: center;
+        }
+        .device-icon {
+            margin-right: 15px;
+            font-size: 20px;
+        }
+        .session-details {
+            color: #aaaaaa;
+            font-size: 14px;
+            margin-top: 3px;
+        }
+        .revoke-btn {
+            background-color: #333333;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+        .revoke-btn:hover {
+            background-color: #444444;
+        }
+    </style>
+</head>
+<body>
+    <div class="profile-container">
+        <h1 class="page-title">Settings</h1>
+        <p class="page-description">You can manage your account, billing, and team settings here.</p>
+
+        <div class="header" style="margin-bottom: 40px;">
+            <img id="user-avatar" src="https://img.loliapi.cn/i/pp/img24.webp" alt="Avatar" class="avatar" style="width: 100px; height: 100px;">
+            <div>
+                <h2 id="user-name" style="font-size: 32px; margin: 0; color: white;">Loading...</h2>
+                <p id="user-email" style="color: #aaaaaa; margin: 5px 0 0 0;">Loading...</p>
+            </div>
+        </div>
+
+        <div class="cards-grid">
+            <div class="card">
+                <h2 class="card-title">Basic Information</h2>
+                <div class="info-item">
+                    <div class="info-label">Name</div>
+                    <div id="info-name" class="info-value">Loading...</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Email</div>
+                    <div class="info-value">
+                        <span id="email-verified-badge" class="not-verified-badge">Loading...</span>
+                        <span id="info-email">Loading...</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title">Account <span style="font-size: 14px; color: #aaaaaa; font-weight: normal;">13 days left in Pro trial</span></h2>
+                <div>
+                    <button class="btn btn-primary">Upgrade to Pro</button>
+                    <button class="btn">Upgrade to Enterprise</button>
+                </div>
+            </div>
+
+            <div class="card card-tall">
+                <h2 class="card-title">Active Sessions</h2>
+                <div class="sessions-list">
+                    <div class="session-item">
+                        <div class="session-info">
+                            <div class="device-icon">💻</div>
+                            <div>
+                                <div>Desktop App Session</div>
+                                <div class="session-details">Created 1 day ago</div>
+                            </div>
+                        </div>
+                        <button class="revoke-btn">✕ Revoke</button>
+                    </div>
+                    <div class="session-item">
+                        <div class="session-info">
+                            <div class="device-icon">🌐</div>
+                            <div>
+                                <div>Web Session</div>
+                                <div class="session-details">Created 1 day ago</div>
+                            </div>
+                        </div>
+                        <button class="revoke-btn">✕ Revoke</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title">Login Count</h2>
+                <div class="info-item">
+                    <div class="info-label">Login Count (Last 30 Days)</div>
+                </div>
+                
+                <div>
+                    <div>Last 30 Days Login Count</div>
+                    <div class="progress-bar">
+                        <div id="login-progress" class="progress-fill" style="width: 0%;"></div>
+                    </div>
+                    <div class="usage-details">
+                        <span id="login-count-text">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <a href="/logout" class="btn">Log Out</a>
+    </div>
+
+    <script>
+        // 页面加载完成后获取用户信息
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchUserInfo();
+        });
+
+        // 获取用户信息的函数
+        async function fetchUserInfo() {
+            try {
+                const response = await fetch('/api/userinfo');
+                
+                if (!response.ok) {
+                    // 如果响应不成功（如401未授权），重定向到登录页面
+                    if (response.status === 401) {
+                        window.location.href = '/';
+                        return;
+                    }
+                    throw new Error('获取用户信息失败');
+                }
+                
+                const userData = await response.json();
+                
+                // 更新页面上的用户信息
+                updateUserInterface(userData);
+            } catch (error) {
+                console.error('获取用户信息出错:', error);
+                // 可以显示错误提示或重定向到登录页面
+                window.location.href = '/?error=session_expired';
+            }
+        }
+
+        // 更新用户界面的函数
+        function updateUserInterface(user) {
+
+            console.log(user);
+            // 更新头像
+            const avatarElement = document.getElementById('user-avatar');
+            if (user.avatar) {
+                avatarElement.src = user.avatar;
+            }
+            
+            // 根据可能的字段获取用户名
+            const username = user.preferred_username || user.name || user.username || '';
+            
+            // 更新用户名
+            document.getElementById('user-name').textContent = username;
+            document.getElementById('info-name').textContent = username;
+            
+            // 更新邮箱
+            document.getElementById('user-email').textContent = user.email || '';
+            document.getElementById('info-email').textContent = user.email || '';
+            
+            // 更新邮箱验证状态
+            const emailVerifiedBadge = document.getElementById('email-verified-badge');
+            if (user.email_verified) {
+                emailVerifiedBadge.textContent = 'Verified';
+                emailVerifiedBadge.className = 'verified-badge';
+            } else {
+                emailVerifiedBadge.textContent = 'Not Verified';
+                emailVerifiedBadge.className = 'not-verified-badge';
+            }
+            
+            // 更新最近30天登录次数
+            const loginCount = user.recent_login_count || 0;
+            document.getElementById('login-count-text').textContent = `最近30天内登录${loginCount}次`;
+            
+            // 计算进度条百分比（最大值为100）
+            const maxLogins = 100;
+            const percentage = Math.min(100, (loginCount / maxLogins) * 100);
+            const progressBar = document.getElementById('login-progress');
+            progressBar.style.width = `${percentage}%`;
+            
+            // 根据登录次数设置不同的颜色
+            if (loginCount <= 30) {
+                // 0-30次：绿色
+                progressBar.style.backgroundColor = '#4caf50';
+            } else if (loginCount <= 60) {
+                // 31-60次：黄色
+                progressBar.style.backgroundColor = '#ffeb3b';
+            } else if (loginCount <= 90) {
+                // 61-90次：橙色
+                progressBar.style.backgroundColor = '#ff9800';
+            } else {
+                // 91+次：红色
+                progressBar.style.backgroundColor = '#f44336';
+            }
+            
+            // 可以添加更多字段的显示，如ID、创建时间、最后登录时间等
+            console.log('用户信息:', user);
+        }
+    </script>
+</body>
+</html> 

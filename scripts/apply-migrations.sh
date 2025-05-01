@@ -10,7 +10,7 @@ MIGRATIONS_DIR="$PROJECT_ROOT/migrations"
 # 数据库连接信息
 DB_HOST=${DB_HOST:-"localhost"}
 DB_PORT=${DB_PORT:-"5432"}
-DB_NAME=${DB_NAME:-"lycrex_auth"}
+DB_NAME=${DB_NAME:-"lycrex_auth_test"}
 DB_USER=${DB_USER:-"kawaaanime"}
 DB_PASSWORD=${DB_PASSWORD:-""}
 

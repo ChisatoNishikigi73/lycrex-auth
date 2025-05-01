@@ -13,8 +13,26 @@ pub enum ClientType {
     Gitea,
     /// Casdoor 兼容
     Casdoor,
+    /// Lycrex 类型
+    Lycrex,
     /// 测试客户端
     Test,
+}
+
+impl ClientType {
+    /// 将ClientType转换为对应的响应类型字符串
+    /// 
+    /// 这个方法用于统一处理ClientType到OAuth响应类型的映射，
+    /// 避免在代码的多个地方重复相同的映射逻辑。
+    pub fn to_response_type(&self) -> &'static str {
+        match self {
+            ClientType::OpenId => "openid",
+            ClientType::Gitea => "gitea",
+            ClientType::Casdoor => "casdoor",
+            ClientType::Lycrex => "lycrex",
+            ClientType::Test => "test",
+        }
+    }
 }
 
 impl Default for ClientType {

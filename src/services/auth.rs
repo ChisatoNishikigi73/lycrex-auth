@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::errors::{AppError, AppResult};
 use crate::models::{
     Authorization, AuthorizationRequest, Client, ClientType, GrantType, Token, TokenRequest, User,
-    OpenIdUserResponse, GiteaUserResponse, TestUserResponse
+    OAuthResponseHandler
 };
 use crate::utils::{password, random, jwt};
 use crate::config::Config;
@@ -232,7 +232,7 @@ async fn create_token(
     Ok(token)
 }
 
-pub async fn find_client_by_client_id(client_id: &str, db: &PgPool) -> AppResult<Client> {
+async fn find_client_by_client_id(client_id: &str, db: &PgPool) -> AppResult<Client> {
     query_as::<_, Client>(r#"SELECT * FROM clients WHERE client_id = $1"#)
     .bind(client_id)
     .fetch_optional(db)
@@ -255,6 +255,7 @@ pub async fn authenticate_client(
     Ok(client)
 }
 
+#[allow(unused)]
 pub async fn get_user_info(user_id: Uuid, db: &PgPool) -> AppResult<User> {
     query_as::<_, User>(r#"SELECT * FROM users WHERE id = $1"#)
     .bind(user_id)
@@ -327,46 +328,17 @@ pub async fn get_user_info_for_client(
     client_type: ClientType,
     db: &PgPool
 ) -> AppResult<serde_json::Value> {
-    let user = get_user_info(user_id, db).await?;
+    // 使用ClientType的to_response_type方法获取响应类型字符串
+    let response_type = client_type.to_response_type();
     
-    let response = match client_type {
-        ClientType::OpenId => {
-            // 返回OpenID格式
-            let response = OpenIdUserResponse::from(user);
+    // 使用统一的OAuthResponseHandler创建响应
+    match OAuthResponseHandler::create_response(response_type, &user_id.to_string(), db).await {
+        Ok(response) => {
+            // 所有响应类型的post_process已在OAuthResponseHandler::create_response中处理
+            // 不再需要为Lycrex类型做特殊处理
             serde_json::to_value(response)
-                .map_err(|e| AppError::InternalServerError(format!("序列化用户信息失败：{}", e)))?
+                .map_err(|e| AppError::InternalServerError(format!("序列化用户信息失败：{}", e)))
         },
-        ClientType::Gitea => {
-            // 返回Gitea格式，并转换ID为数字
-            let mut response = serde_json::to_value(GiteaUserResponse::from(user))
-                .map_err(|e| AppError::InternalServerError(format!("序列化用户信息失败：{}", e)))?;
-            
-            // Gitea需要数字类型的ID
-            if let Some(id_field) = response.get_mut("id") {
-                // 简单处理：将UUID的前几位转为数字
-                let id_str = id_field.as_str().unwrap_or("");
-                if let Some(first_part) = id_str.split('-').next() {
-                    if let Ok(id_num) = u64::from_str_radix(&first_part, 16) {
-                        *id_field = serde_json::Value::Number(serde_json::Number::from(id_num % 1000000));
-                    }
-                }
-            }
-            
-            response
-        },
-        ClientType::Casdoor => {
-            // 返回Casdoor格式
-            let response = crate::models::oauth::casdoor::CasdoorUserResponse::from(user);
-            serde_json::to_value(response)
-                .map_err(|e| AppError::InternalServerError(format!("序列化用户信息失败：{}", e)))?
-        },
-        ClientType::Test => {
-            // 返回测试格式
-            let response = TestUserResponse::from(user);
-            serde_json::to_value(response)
-                .map_err(|e| AppError::InternalServerError(format!("序列化用户信息失败：{}", e)))?
-        },
-    };
-    
-    Ok(response)
+        Err(err) => Err(AppError::InternalServerError(format!("创建OAuth响应失败：{}", err))),
+    }
 } 

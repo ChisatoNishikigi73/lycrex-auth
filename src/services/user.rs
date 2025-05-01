@@ -278,4 +278,25 @@ pub async fn delete_user(id: Uuid, db: &PgPool) -> AppResult<()> {
     }
     
     Ok(())
+}
+
+/// 获取用户最近30天的登录次数
+pub async fn get_recent_login_count(user_id: Uuid, db: &PgPool) -> AppResult<i64> {
+    let fourteen_days_ago = Utc::now() - chrono::Duration::days(30);
+    
+    let count = query(
+        r#"
+        SELECT COUNT(*) 
+        FROM tokens 
+        WHERE user_id = $1 
+        AND created_at >= $2
+        "#)
+    .bind(user_id)
+    .bind(fourteen_days_ago)
+    .fetch_one(db)
+    .await
+    .map_err(AppError::DatabaseError)?
+    .get::<i64, _>(0);
+    
+    Ok(count)
 } 
