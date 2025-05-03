@@ -1,23 +1,27 @@
 use serde::{Deserialize, Serialize};
 use crate::models::User;
 use crate::models::oauth::interface::OAuthResponse;
+use crate::routes::service::get_avatar_url_by_id;
 use crate::utils::id::uuid_to_gitea_id;
 
-/// Gitea兼容用户响应结构体 (扩展自OpenID标准)
+/// Gitea兼容用户响应结构体 (符合Gitea API标准)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GiteaUserResponse {
-    // OpenID Connect标准字段
+    // Gitea标准字段
+    pub id: i64,
+    pub login: String,
+    pub full_name: String,
+    pub email: String,
+    pub avatar_url: String,
+    pub html_url: String,
+    pub is_admin: bool,
+    pub username: String,
+    
+    // OpenID Connect标准字段（保留向后兼容性）
     pub sub: String,
     pub name: String,
     pub preferred_username: String,
-    pub email: String,
     pub email_verified: bool,
-    
-    // Gitea兼容字段
-    pub id: i64, // 修改为整数类型以匹配Gitea的期望
-    pub login: String,
-    pub username: String,
-    pub avatar_url: String, // 修改为非Option类型，确保始终有值
 }
 
 // 实现OAuthResponse接口
@@ -25,37 +29,31 @@ impl OAuthResponse for GiteaUserResponse {
     fn from_user(user: &User) -> Self {
         let id_str = user.id.to_string();
         
-        // 使用Gitea专用的ID转换函数，生成较小且稳定的ID
+        // 使用更可靠的UUID转换工具生成稳定的i64 ID
         let id_num = uuid_to_gitea_id(user.id);
         
-        // 直接使用base64格式的头像数据，而不是URL
-        // Gitea需要直接使用头像数据而不是URL引用
-        let avatar_url = match &user.avatar {
-            Some(avatar_base64) => {
-                // 确保头像数据有data:前缀
-                if avatar_base64.starts_with("data:") {
-                    avatar_base64.clone()
-                } else {
-                    format!("data:image/png;base64,{}", avatar_base64)
-                }
-            },
-            None => {
-                "".to_string()
-            }
-        };
+        // 从用户的avatar字段生成avatar_url，确保URL是绝对路径
+        let avatar_url = get_avatar_url_by_id(user.id);
+        
+        // 构建个人主页URL
+        let html_url = format!("https://lycrex.com");
         
         Self {
-            sub: id_str.clone(),
-            name: user.username.clone(),
-            preferred_username: user.username.clone(),
-            email: user.email.clone(),
-            email_verified: user.email_verified,
-            
-            // Gitea兼容字段
+            // Gitea标准字段
             id: id_num,
             login: user.username.clone(),
-            username: user.username.clone(),
+            full_name: user.username.clone(), // 如果没有专门的全名字段，可以初始设置为用户名
+            email: user.email.clone(),
             avatar_url,
+            html_url,
+            is_admin: false, // 默认非管理员
+            username: user.username.clone(),
+            
+            // OpenID Connect标准字段
+            sub: id_str,
+            name: user.username.clone(),
+            preferred_username: user.username.clone(),
+            email_verified: user.email_verified,
         }
     }
     
