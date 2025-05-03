@@ -5,6 +5,7 @@ use uuid::Uuid;
 use actix_multipart::Multipart;
 use futures::{StreamExt, TryStreamExt};
 use std::io::Write;
+use base64::engine::Engine;
 
 use crate::middleware::auth::AuthenticatedUser;
 use crate::services::user as user_service;
@@ -158,7 +159,7 @@ pub async fn upload_avatar(
             }
             
             // 将图像数据转换为base64
-            let base64_data = base64::encode(&buffer);
+            let base64_data = base64::engine::general_purpose::STANDARD.encode(&buffer);
             avatar_data = Some(base64_data);
         }
     }

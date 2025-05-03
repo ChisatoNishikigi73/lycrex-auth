@@ -20,9 +20,7 @@ url = "postgres://postgres:postgres@localhost/lycrex_auth"
 # 允许的来源域名列表
 allowed_origins = [
     "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:8080",
-    "http://localhost:8080"
+    "http://127.0.0.1:3000"
 ]
 
 # 日志配置

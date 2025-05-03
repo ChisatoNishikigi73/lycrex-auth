@@ -10,7 +10,7 @@ use uuid::Uuid;
 use serde_json::{self, json};
 
 use crate::middleware::auth::AuthenticatedUser;
-use crate::models::{AuthorizationRequest, TokenRequest, UserCreate, UserLogin, User, OAuthResponseHandler};
+use crate::models::{AuthorizationRequest, TokenRequest, UserCreate, UserLogin, OAuthResponseHandler};
 use crate::services::{auth as auth_service, user as user_service};
 
 /// 构建登录页面重定向URL的辅助函数
@@ -607,7 +607,7 @@ pub async fn logout(
         req.headers().get("Authorization").is_some();
     
     // 吊销令牌，并获取用户ID
-    let user_id = revoke_user_tokens(&req, &session, &db).await;
+    let _user_id = revoke_user_tokens(&req, &session, &db).await;
     
     // 记录会话已退出 (在清除会话前先记录)
     if let Ok(Some(user_id_str)) = session.get::<String>("user_id") {

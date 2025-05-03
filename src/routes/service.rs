@@ -1,7 +1,7 @@
 use actix_web::{get, web, HttpResponse, Responder};
 use sqlx::PgPool;
 use uuid::Uuid;
-use crate::services::user as user_service;
+use crate::{config::Config, services::user as user_service};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::Deserialize;
 
@@ -186,5 +186,5 @@ pub fn get_default_avatar() -> &'static str {
 
 /// 获取用户头像URL
 pub fn get_avatar_url_by_id(user_id: Uuid) -> String {
-    format!("http://127.0.0.1:8080/api/service/profile/{}/avatar", user_id)
+    format!("{}/api/service/profile/{}/avatar", Config::get_global().server.public_url, user_id)
 }

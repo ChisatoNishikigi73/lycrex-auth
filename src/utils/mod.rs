@@ -8,3 +8,5 @@ pub mod random;
 pub mod templates; 
 /// 静态文件处理工具
 pub mod static_files;
+/// ID 处理工具
+pub mod id;

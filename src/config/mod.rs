@@ -14,6 +14,8 @@ pub struct ServerConfig {
     pub port: u16,
     /// 用于会话和安全功能的密钥
     pub secret_key: String,
+    /// 公共URL
+    pub public_url: String,
 }
 
 /// 数据库配置
@@ -205,6 +207,7 @@ impl Default for Config {
                 host: "127.0.0.1".to_string(),
                 port: 8080,
                 secret_key: "开发环境密钥，请在生产环境中替换".to_string(),
+                public_url: "https://oauth.lycrex.com".to_string(),
             },
             database: DatabaseConfig {
                 url: "postgres://postgres:postgres@localhost/lycrex_auth".to_string(),
@@ -213,8 +216,6 @@ impl Default for Config {
                 allowed_origins: vec![
                     "http://localhost:3000".to_string(),
                     "http://127.0.0.1:3000".to_string(),
-                    "http://127.0.0.1:8080".to_string(),
-                    "http://localhost:8080".to_string(),
                 ],
             },
             log: LogConfig {

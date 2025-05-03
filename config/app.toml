@@ -9,6 +9,8 @@ host = "0.0.0.0"
 port = 8080
 # 会话密钥，生产环境必须修改为复杂的随机值
 secret_key = "请在生产环境修改为随机密钥"
+# 公共URL
+public_url = "https://oauth.lycrex.com"
 
 # 数据库配置
 [database]
@@ -21,8 +23,6 @@ url = "postgres://kawaaanime@localhost/lycrex_auth_test"
 allowed_origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://127.0.0.1:8080",
-    "http://localhost:8080"
 ]
 
 # 日志配置
