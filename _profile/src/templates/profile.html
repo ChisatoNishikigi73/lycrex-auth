@@ -398,7 +398,7 @@
                 <div class="dropdown-item dropdown-disabled">个人资料</div>
                 <div class="dropdown-item dropdown-disabled">账户设置</div>
                 <div class="dropdown-divider"></div>
-                <a href="/logout" class="dropdown-item">退出登录</a>
+                <a href="/profile/logout" class="dropdown-item">退出登录</a>
             </div>
         </div>
     </nav>
@@ -471,7 +471,7 @@
             </div>
         </div>
 
-        <a href="/logout" class="btn">Log Out</a>
+        <a href="/profile/logout" class="btn">Log Out</a>
     </div>
 
     <!-- 消息提示 -->
@@ -595,7 +595,7 @@
         // 获取用户信息
         async function fetchUserInfo() {
             try {
-                const response = await fetch('/api/userinfo');
+                const response = await fetch('/profile/api/userinfo');
                 
                 if (!response.ok) {
                     // 如果响应不成功（如401未授权），重定向到登录页面
@@ -603,7 +603,7 @@
                         // 防止无限重定向循环
                         if (!redirectAttempted) {
                             redirectAttempted = true;
-                            window.location.href = '/?error=session_expired';
+                            window.location.href = '/auth?error=session_expired';
                         }
                         return;
                     }
@@ -700,7 +700,7 @@
         // 获取登录统计信息
         async function fetchLoginStats() {
             try {
-                const response = await fetch('/api/user/login-stats');
+                const response = await fetch('/profile/api/user/login-stats');
                 
                 if (!response.ok) {
                     // 处理错误但不重定向
@@ -814,7 +814,7 @@
                 formData.append('avatar', file);
                 
                 // 发送请求
-                const uploadResponse = await fetch('/api/upload-avatar', {
+                const uploadResponse = await fetch('/profile/api/upload-avatar', {
                     method: 'POST',
                     body: formData
                 });

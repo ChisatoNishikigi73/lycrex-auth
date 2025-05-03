@@ -1,8 +1,9 @@
 use actix_files::Files;
-use actix_web::{middleware, web, App, HttpServer};
+use actix_web::{middleware, web, App, HttpServer, HttpResponse, HttpRequest};
 use dotenv::dotenv;
 use log::info;
 use std::sync::Mutex;
+use actix_web::http;
 
 // 模块声明
 mod models;
@@ -44,25 +45,28 @@ async fn main() -> std::io::Result<()> {
     // 启动服务器
     info!("启动服务器，监听地址: {}:{}", host, port);
     HttpServer::new(move || {
-        // 初始化模板系统
-        let mut tera = tera::Tera::new("src/templates/**/*").unwrap();
-        tera.autoescape_on(vec!["html"]);
-        
         App::new()
             .wrap(middleware::Logger::default())
-            .app_data(web::Data::new(tera))
             .app_data(web::Data::new(oauth_config.clone()))
             .app_data(web::Data::new(client.clone()))
             .app_data(processed_codes.clone())
-            .service(handlers::index)
-            .service(handlers::oauth_callback)
-            .service(handlers::profile)
-            .service(handlers::logout)
-            .service(handlers::get_user_info_api)
-            .service(handlers::get_login_stats_api)
-            .service(handlers::get_recent_clients_api)
-            .service(handlers::upload_avatar)
+            // 静态文件路由
             .service(Files::new("/static", "src/static"))
+            // 将首页和OAuth回调路由放在/auth作用域下
+            .service(
+                web::scope("/auth")
+                    .service(handlers::index)
+                    .service(handlers::oauth_callback)
+            )
+            // 将profile相关的路由和API路由放在/profile路径下
+            .service(
+                web::scope("/profile")
+                    .service(handlers::profile)
+                    .service(handlers::logout)
+                    .service(handlers::get_user_info_api)
+                    .service(handlers::get_login_stats_api)
+                    .service(handlers::upload_avatar)
+            )
     })
     .bind((host, port))?
     .run()

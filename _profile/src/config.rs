@@ -15,7 +15,7 @@ impl OAuthConfig {
             auth_server_url: get_env_or_default("AUTH_SERVER_URL", "http://127.0.0.1:8080"),
             client_id: get_env_or_default("CLIENT_ID", "profile-client"),
             client_secret: get_env_or_default("CLIENT_SECRET", "profile-secret"),
-            redirect_uri: get_env_or_default("REDIRECT_URI", "http://localhost:3000/callback"),
+            redirect_uri: get_env_or_default("REDIRECT_URI", "http://localhost:3000/auth/callback"),
         }
     }
 }

@@ -8,13 +8,11 @@ use futures::StreamExt;
 use log::{error, info};
 use serde_json;
 use std::sync::Mutex;
-use tera::Context;
 
 /// 首页路由
-#[get("/")]
+#[get("")]
 pub async fn index(
     req: HttpRequest,
-    tmpl: web::Data<tera::Tera>,
     oauth_config: web::Data<OAuthConfig>,
 ) -> impl Responder {
     // 检查是否已经登录（通过access_token cookie判断）
@@ -30,9 +28,6 @@ pub async fn index(
         "{}/api/oauth/authorize?response_type=lycrex&client_id={}&redirect_uri={}",
         oauth_config.auth_server_url, oauth_config.client_id, oauth_config.redirect_uri
     );
-
-    let mut context = Context::new();
-    context.insert("oauth_url", &oauth_url);
     
     // 检查查询参数中是否有错误信息
     let query = req.query_string();
@@ -48,29 +43,43 @@ pub async fn index(
         ""
     };
     
-    if !error_type.is_empty() {
-        let error_message = match error_type {
+    let error_message = if !error_type.is_empty() {
+        match error_type {
             "session_expired" => "您的会话已过期，请重新登录",
             "token_error" => "获取授权令牌失败，请重试",
             "userinfo_error" => "获取用户信息失败，请重试",
             "no_code" => "未收到授权码，请重试",
             _ => "登录过程中发生未知错误，请重试"
-        };
-        context.insert("error_message", error_message);
-    }
-
-    // 渲染登录页面
-    match tmpl.render("login.html", &context) {
-        Ok(s) => HttpResponse::Ok().content_type("text/html").body(s),
-        Err(e) => {
-            error!("模板渲染错误: {}", e);
-            HttpResponse::InternalServerError().body("模板渲染错误")
         }
+    } else {
+        ""
+    };
+
+    // 获取HTML模板
+    let mut html = include_str!("templates/login.html").to_string();
+    
+    // 替换模板变量
+    html = html.replace("{{ oauth_url }}", &oauth_url);
+    
+    // 如果有错误信息，添加错误提示脚本
+    if !error_message.is_empty() {
+        let error_script = format!(
+            r#"<script>
+                document.addEventListener('DOMContentLoaded', function() {{
+                    document.getElementById('error').textContent = "{}";
+                    document.getElementById('error').style.display = 'block';
+                }});
+            </script>"#,
+            error_message
+        );
+        html = html.replace("</body>", &format!("{}\n</body>", error_script));
     }
+    
+    HttpResponse::Ok().content_type("text/html").body(html)
 }
 
 /// 用于OAuth回调的路由
-#[get("/callback")]
+#[get("callback")]
 pub async fn oauth_callback(
     req: HttpRequest,
     oauth_config: web::Data<OAuthConfig>,
@@ -92,7 +101,7 @@ pub async fn oauth_callback(
         None => {
             error!("回调请求中没有授权码");
             return HttpResponse::Found()
-                .append_header((http::header::LOCATION, "/?error=no_code"))
+                .append_header((http::header::LOCATION, "/auth?error=no_code"))
                 .finish();
         }
     };
@@ -188,7 +197,7 @@ pub async fn oauth_callback(
                 Err(e) => {
                     error!("获取用户信息失败: {}", e);
                     HttpResponse::Found()
-                        .append_header((http::header::LOCATION, "/?error=userinfo_error"))
+                        .append_header((http::header::LOCATION, "/auth?error=userinfo_error"))
                         .finish()
                 }
             }
@@ -196,7 +205,7 @@ pub async fn oauth_callback(
         Err(e) => {
             error!("获取令牌失败: {}", e);
             HttpResponse::Found()
-                .append_header((http::header::LOCATION, "/?error=token_error"))
+                .append_header((http::header::LOCATION, "/auth?error=token_error"))
                 .finish()
         }
     }
@@ -532,146 +541,13 @@ pub async fn get_login_stats_api(
     }
 }
 
-/// 获取最近登录客户端API
-#[get("/api/user/recent-clients")]
-pub async fn get_recent_clients_api(
-    req: HttpRequest, 
-    client: web::Data<reqwest::Client>,
-    oauth_config: web::Data<OAuthConfig>,
-) -> impl Responder {
-    // 检查是否已登录
-    let access_token = match req.cookie("access_token") {
-        Some(cookie) => cookie.value().to_string(),
-        None => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "error": "未登录或会话已过期"
-            }));
-        }
-    };
-
-    // 从userinfo接口获取用户ID
-    let user_info_url = format!("{}/api/oauth/userinfo", oauth_config.auth_server_url);
-    
-    let user_response = match client
-        .get(&user_info_url)
-        .header("Authorization", format!("Bearer {}", access_token))
-        .send()
-        .await {
-            Ok(resp) => resp,
-            Err(e) => {
-                error!("请求用户信息失败: {}", e);
-                return HttpResponse::InternalServerError().json(serde_json::json!({
-                    "error": "获取用户信息失败"
-                }));
-            }
-        };
-
-    if !user_response.status().is_success() {
-        return HttpResponse::InternalServerError().json(serde_json::json!({
-            "error": "获取用户信息失败"
-        }));
-    }
-
-    // 解析用户ID
-    let user_info = match user_response.json::<serde_json::Value>().await {
-        Ok(json) => json,
-        Err(e) => {
-            error!("解析用户信息失败: {}", e);
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "解析用户信息失败"
-            }));
-        }
-    };
-
-    let user_id = match user_info.get("id") {
-        Some(id) => id.as_str().unwrap_or_default(),
-        None => {
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "用户ID不存在"
-            }));
-        }
-    };
-
-    // 获取登录统计数据
-    let stats_url = format!("{}/api/users/{}/login-stats", oauth_config.auth_server_url, user_id);
-    
-    let stats_response = match client
-        .get(&stats_url)
-        .header("Authorization", format!("Bearer {}", access_token))
-        .send()
-        .await {
-            Ok(resp) => resp,
-            Err(e) => {
-                error!("请求登录统计失败: {}", e);
-                return HttpResponse::InternalServerError().json(serde_json::json!({
-                    "error": "获取登录统计失败"
-                }));
-            }
-        };
-
-    if !stats_response.status().is_success() {
-        let error_text = stats_response.text().await.unwrap_or_default();
-        error!("获取登录统计响应错误: {}", error_text);
-        return HttpResponse::InternalServerError().json(serde_json::json!({
-            "error": "获取登录统计失败"
-        }));
-    }
-
-    // 解析登录统计数据，并将客户端统计转换为前端需要的格式
-    let stats_data = match stats_response.json::<serde_json::Value>().await {
-        Ok(json) => json,
-        Err(e) => {
-            error!("解析登录统计失败: {}", e);
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "解析登录统计失败"
-            }));
-        }
-    };
-
-    // 提取client_stats数组并转换为前端需要的格式
-    let client_stats = match stats_data.get("client_stats") {
-        Some(stats) => {
-            if let Some(stats_array) = stats.as_array() {
-                let mut clients = Vec::new();
-                
-                for stat in stats_array {
-                    let client_name = stat.get("client_name").and_then(|n| n.as_str()).unwrap_or("未知客户端");
-                    let login_count = stat.get("login_count").and_then(|c| c.as_i64()).unwrap_or(0);
-                    
-                    clients.push(serde_json::json!({
-                        "client_id": "00000000-0000-0000-0000-000000000000", 
-                        "client_name": client_name,
-                        "login_count": login_count,
-                        "last_login": "刚刚", 
-                        "client_type": "标准客户端"
-                    }));
-                }
-                
-                clients
-            } else {
-                Vec::new()
-            }
-        },
-        None => Vec::new()
-    };
-
-    // 返回转换后的客户端列表
-    HttpResponse::Ok().json(client_stats)
-}
-
 /// 个人资料页面路由
-#[get("/profile")]
-pub async fn profile(tmpl: web::Data<tera::Tera>) -> impl Responder {
-    let context = Context::new();
-    
-    // 渲染个人资料页面
-    match tmpl.render("profile.html", &context) {
-        Ok(s) => HttpResponse::Ok().content_type("text/html").body(s),
-        Err(e) => {
-            error!("模板渲染错误: {}", e);
-            HttpResponse::InternalServerError().body("模板渲染错误")
-        }
-    }
+#[get("")]
+pub async fn profile() -> impl Responder {
+    // 直接返回静态HTML文件，不再使用模板渲染
+    HttpResponse::Ok()
+        .content_type("text/html")
+        .body(include_str!("templates/profile.html"))
 }
 
 /// 登出路由
@@ -691,6 +567,6 @@ pub async fn logout() -> impl Responder {
                 .max_age(actix_web::cookie::time::Duration::seconds(0))
                 .finish(),
         )
-        .append_header((http::header::LOCATION, "/"))
+        .append_header((http::header::LOCATION, "/auth"))
         .finish()
 } 
