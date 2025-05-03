@@ -2,6 +2,9 @@ use actix_web::{web, HttpResponse, Responder};
 use serde::Deserialize;
 use sqlx::PgPool;
 use uuid::Uuid;
+use actix_multipart::Multipart;
+use futures::{StreamExt, TryStreamExt};
+use std::io::Write;
 
 use crate::middleware::auth::AuthenticatedUser;
 use crate::services::user as user_service;
@@ -62,7 +65,7 @@ pub async fn update_user(
         Ok(user) => HttpResponse::Ok().json(user),
         Err(err) => HttpResponse::BadRequest().json(err.to_string()),
     }
-} 
+}
 
 // 获取用户登录历史
 pub async fn get_login_history(
@@ -115,5 +118,66 @@ pub async fn get_login_stats(
     match user_service::get_login_stats(user_id, start_date, end_date, days, &db).await {
         Ok(stats) => HttpResponse::Ok().json(stats),
         Err(err) => HttpResponse::BadRequest().json(err.to_string()),
+    }
+}
+
+// 上传头像
+pub async fn upload_avatar(
+    path: web::Path<Uuid>,
+    user: web::ReqData<AuthenticatedUser>,
+    mut payload: Multipart,
+    db: web::Data<PgPool>,
+) -> impl Responder {
+    // 检查是否是当前用户
+    let user_id = path.into_inner();
+    let auth_user = user.into_inner();
+    
+    if auth_user.user_id != user_id {
+        return HttpResponse::Forbidden().json("无权修改其他用户的头像");
+    }
+    
+    // 处理文件上传
+    let mut avatar_data = None;
+    
+    while let Ok(Some(mut field)) = payload.try_next().await {
+        let content_disposition = field.content_disposition();
+        let field_name = content_disposition.get_name().unwrap_or_default();
+        
+        if field_name == "avatar" {
+            // 读取文件内容到内存
+            let mut buffer = Vec::new();
+            
+            while let Some(chunk) = field.next().await {
+                let data = chunk.unwrap();
+                buffer.write_all(&data).unwrap();
+            }
+            
+            // 检查文件大小 (限制为4MB)
+            if buffer.len() > 4 * 1024 * 1024 {
+                return HttpResponse::BadRequest().json("头像文件太大，请上传小于4MB的文件");
+            }
+            
+            // 将图像数据转换为base64
+            let base64_data = base64::encode(&buffer);
+            avatar_data = Some(base64_data);
+        }
+    }
+    
+    // 如果成功获取了头像数据，更新用户
+    if let Some(avatar) = avatar_data {
+        match user_service::update_user(
+            user_id,
+            None,
+            None,
+            Some(avatar),
+            &db,
+        )
+        .await
+        {
+            Ok(user) => HttpResponse::Ok().json(user),
+            Err(err) => HttpResponse::BadRequest().json(err.to_string()),
+        }
+    } else {
+        HttpResponse::BadRequest().json("未找到头像文件或处理失败")
     }
 }

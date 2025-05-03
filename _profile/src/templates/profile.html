@@ -10,11 +10,107 @@
             background-color: #000000;
             color: #ffffff;
             margin: 0;
-            padding: 20px;
+            padding: 0;
+        }
+        .navbar {
+            background-color: #000000;
+            border-radius: 12px;
+            margin: 15px 40px;
+            padding: 0 20px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            /* border: 1px solid #333333; */
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            width: calc(100% - 80px);
+            box-sizing: border-box;
+            transition: box-shadow 0.3s ease;
+        }
+        .navbar.scrolled {
+            box-shadow: 0 0 20px 8px rgba(255, 255, 255, 0.1);
+        }
+        .navbar-brand {
+            font-size: 24px;
+            font-weight: bold;
+            color: #ffffff;
+            text-decoration: none;
+        }
+        .navbar-nav {
+            display: flex;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        .nav-item {
+            margin: 0 15px;
+        }
+        .nav-link {
+            color: #cccccc;
+            text-decoration: none;
+            font-size: 16px;
+            transition: color 0.2s ease;
+        }
+        .nav-link:hover {
+            color: #ffffff;
+        }
+        .profile-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            background-color: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .profile-icon svg {
+            width: 24px;
+            height: 24px;
+            fill: #ffffff;
+        }
+        .profile-dropdown {
+            position: absolute;
+            top: 55px;
+            right: 0;
+            background-color: #111111;
+            border-radius: 12px;
+            border: 1px solid #333333;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            width: 250px;
+            z-index: 1000;
+            display: none;
+        }
+        .profile-dropdown.show {
+            display: block;
+        }
+        .dropdown-item {
+            display: block;
+            padding: 12px 16px;
+            color: #ffffff;
+            text-decoration: none;
+            border-bottom: 1px solid #222222;
+        }
+        .dropdown-item:last-child {
+            border-bottom: none;
+        }
+        .dropdown-item:hover {
+            background-color: #222222;
+        }
+        .dropdown-divider {
+            height: 1px;
+            background-color: #333333;
+            margin: 0;
         }
         .profile-container {
             max-width: 1200px;
-            margin: 40px auto;
+            margin: 120px auto 30px;
         }
         h1.page-title {
             font-size: 48px;
@@ -27,13 +123,13 @@
         .cards-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            margin-bottom: 40px;
+            gap: 20px;
+            margin-bottom: 30px;
         }
         .card {
-            background-color: #111111;
+            background-color: #0c0c0c;
             border-radius: 12px;
-            padding: 40px;
+            padding: 25px;
             box-shadow: 0 8px 12px rgba(0, 0, 0, 0.3);
             border: 1px solid #333333;
         }
@@ -44,22 +140,82 @@
             grid-row: span 2;
         }
         .card-title {
-            font-size: 33px;
+            font-size: 28px;
             margin-top: 0;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
         .header {
             display: flex;
             align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
+        }
+        .avatar-container {
+            position: relative;
+            width: 100px;
+            height: 100px;
+            margin-right: 20px;
+            border-radius: 50%;
+            overflow: hidden;
+            cursor: pointer;
         }
         .avatar {
-            width: 80px;
-            height: 80px;
+            width: 100px;
+            height: 100px;
             border-radius: 50%;
             object-fit: cover;
-            margin-right: 20px;
             background-color: #333333;
+            transition: filter 0.3s ease;
+        }
+        .avatar-upload {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.3);
+            color: #ffffff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 32px;
+            font-weight: 300;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .avatar-container:hover .avatar {
+            filter: grayscale(50%);
+        }
+        .avatar-container:hover .avatar-upload {
+            opacity: 1;
+        }
+        .avatar-upload-input {
+            display: none;
+        }
+        .toast {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background-color: #333333;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            z-index: 1000;
+            transition: transform 0.3s, opacity 0.3s;
+            transform: translateY(-20px);
+            opacity: 0;
+        }
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        .toast.success {
+            background-color: #4caf50;
+        }
+        .toast.error {
+            background-color: #f44336;
         }
         .user-name {
             font-size: 20px;
@@ -72,7 +228,7 @@
         }
         .info-item {
             display: flex;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
             align-items: center;
         }
         .info-label {
@@ -153,9 +309,9 @@
             justify-content: space-between;
             align-items: center;
             background-color: #222222;
-            padding: 15px;
+            padding: 10px 15px;
             border-radius: 4px;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
         .session-info {
             display: flex;
@@ -188,15 +344,78 @@
             color: #aaaaaa;
             font-size: 14px;
         }
+        .user-info-container {
+            padding: 16px;
+            border-bottom: 1px solid #222222;
+        }
+        .user-name {
+            font-size: 18px;
+            font-weight: bold;
+            margin: 0 0 5px 0;
+            text-transform: uppercase;
+        }
+        .user-email {
+            font-size: 14px;
+            color: #aaaaaa;
+            margin: 0;
+            word-break: break-all;
+        }
+        .dropdown-disabled {
+            color: #666666;
+            cursor: not-allowed;
+        }
+        .dropdown-disabled:hover {
+            background-color: transparent;
+        }
     </style>
 </head>
 <body>
+    <nav class="navbar">
+        <a href="/" class="navbar-brand">LycreX</a>
+        
+        <ul class="navbar-nav">
+            <li class="nav-item">
+                <a href="https://lycrex.com" class="nav-link">LYCREX</a>
+            </li>
+            <li class="nav-item">
+                <a href="https://git.lycrex.com" class="nav-link">GIT</a>
+            </li>
+            <li class="nav-item">
+                <a href="https://lab.lycrex.com" class="nav-link">LAB</a>
+            </li>
+        </ul>
+        
+        <div class="profile-icon" id="profileIcon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2a7.2 7.2 0 01-6-3.22c.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08a7.2 7.2 0 01-6 3.22z"/>
+            </svg>
+            
+            <div class="profile-dropdown" id="profileDropdown">
+                <div class="user-info-container">
+                    <div class="user-name" id="dropdown-user-name">加载中...</div>
+                    <div class="user-email" id="dropdown-user-email">加载中...</div>
+                </div>
+                <div class="dropdown-item dropdown-disabled">个人资料</div>
+                <div class="dropdown-item dropdown-disabled">账户设置</div>
+                <div class="dropdown-divider"></div>
+                <a href="/logout" class="dropdown-item">退出登录</a>
+            </div>
+        </div>
+    </nav>
+
     <div class="profile-container">
         <h1 class="page-title">Settings</h1>
-        <p class="page-description">You can manage your account, billing, and team settings here.</p>
+        <p class="page-description">You can manage your account, token, and client settings here.</p>
 
         <div class="header" style="margin-bottom: 40px;">
-            <img id="user-avatar" src="https://img.loliapi.cn/i/pp/img24.webp" alt="Avatar" class="avatar" style="width: 100px; height: 100px;">
+            <div class="avatar-container" id="avatar-upload-btn">
+                <!-- <img id="user-avatar" src="/assets/default-avatar.png" alt="Avatar" class="avatar"> -->
+                <img id="user-avatar" alt="Avatar" class="avatar">
+                <div class="avatar-upload">
+                    <span>+</span>
+                    <input type="file" id="avatar-input" class="avatar-upload-input" accept="image/png,image/jpeg,image/gif">
+                </div>
+            </div>
             <div>
                 <h2 id="user-name" style="font-size: 32px; margin: 0; color: white;">Loading...</h2>
                 <p id="user-email" style="color: #aaaaaa; margin: 5px 0 0 0;">Loading...</p>
@@ -255,14 +474,125 @@
         <a href="/logout" class="btn">Log Out</a>
     </div>
 
+    <!-- 消息提示 -->
+    <div id="toast" class="toast"></div>
+
     <script>
-        // 页面加载完成后获取用户信息
+        // 用于防止无限重定向循环的标记
+        let redirectAttempted = false;
+        
+        // 全局变量
+        let dropdownUserName;
+        let dropdownUserEmail;
+        
+        // 页面初始化
         document.addEventListener('DOMContentLoaded', function() {
+            // 检查URL中是否包含错误参数
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('error')) {
+                const error = urlParams.get('error');
+                // 如果存在session_expired错误且没有之前的重定向尝试
+                if (error === 'session_expired' && !sessionStorage.getItem('redirectAttempted')) {
+                    // 设置标记，避免再次重定向
+                    sessionStorage.setItem('redirectAttempted', 'true');
+                    // 直接跳转到登录页面
+                    window.location.href = '/';
+                    return;
+                }
+            } else {
+                // 如果当前页面没有错误参数，清除之前的重定向标记
+                sessionStorage.removeItem('redirectAttempted');
+            }
+            
+            // 初始化数据
             fetchUserInfo();
-            fetchLoginStats(); // 使用新的API加载客户端统计
+            fetchLoginStats();
+            
+            // 初始化下拉菜单
+            initProfileDropdown();
+            
+            // 监听页面滚动，为导航栏添加光晕效果
+            initNavbarScrollEffect();
+
+            // 初始化头像上传功能
+            initAvatarUpload();
         });
 
-        // 获取用户信息的函数
+        // 初始化个人资料下拉菜单
+        function initProfileDropdown() {
+            const profileIcon = document.getElementById('profileIcon');
+            const profileDropdown = document.getElementById('profileDropdown');
+            // 初始化全局变量
+            dropdownUserName = document.getElementById('dropdown-user-name');
+            dropdownUserEmail = document.getElementById('dropdown-user-email');
+            
+            profileIcon.addEventListener('click', function(e) {
+                e.stopPropagation();
+                profileDropdown.classList.toggle('show');
+            });
+            
+            // 点击页面其他地方时关闭下拉菜单
+            document.addEventListener('click', function() {
+                profileDropdown.classList.remove('show');
+            });
+        }
+        
+        // 初始化导航栏滚动效果
+        function initNavbarScrollEffect() {
+            const navbar = document.querySelector('.navbar');
+            window.addEventListener('scroll', function() {
+                if (window.scrollY > 10) {
+                    navbar.classList.add('scrolled');
+                } else {
+                    navbar.classList.remove('scrolled');
+                }
+            });
+        }
+        
+        // 初始化头像上传功能
+        function initAvatarUpload() {
+            const avatarContainer = document.getElementById('avatar-upload-btn');
+            const avatarInput = document.getElementById('avatar-input');
+            
+            avatarContainer.addEventListener('click', function() {
+                avatarInput.click();
+            });
+            
+            avatarInput.addEventListener('change', function(e) {
+                if (e.target.files.length > 0) {
+                    const file = e.target.files[0];
+                    
+                    // 检查文件大小（限制为4MB）
+                    if (file.size > 4 * 1024 * 1024) {
+                        showToast('头像文件过大，请选择小于4MB的图片', 'error');
+                        return;
+                    }
+                    
+                    // 检查文件类型
+                    if (!file.type.startsWith('image/')) {
+                        showToast('请选择图片文件', 'error');
+                        return;
+                    }
+                    
+                    // 预览图像
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        document.getElementById('user-avatar').src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                    
+                    // 上传头像
+                    uploadAvatar(file);
+                }
+            });
+            
+            // 阻止冒泡，避免点击input时触发container的点击事件
+            avatarInput.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+        }
+
+        // 获取用户信息
         async function fetchUserInfo() {
             try {
                 const response = await fetch('/api/userinfo');
@@ -270,7 +600,11 @@
                 if (!response.ok) {
                     // 如果响应不成功（如401未授权），重定向到登录页面
                     if (response.status === 401) {
-                        window.location.href = '/';
+                        // 防止无限重定向循环
+                        if (!redirectAttempted) {
+                            redirectAttempted = true;
+                            window.location.href = '/?error=session_expired';
+                        }
                         return;
                     }
                     throw new Error('获取用户信息失败');
@@ -281,60 +615,47 @@
                 // 更新页面上的用户信息
                 updateUserInterface(userData);
             } catch (error) {
-                console.error('获取用户信息出错:', error);
-                // 可以显示错误提示或重定向到登录页面
-                window.location.href = '/?error=session_expired';
+                // 防止无限重定向循环
+                if (!redirectAttempted) {
+                    redirectAttempted = true;
+                }
             }
         }
 
-        // 更新用户界面的函数
+        // 更新用户界面
         function updateUserInterface(user) {
-            console.log(user);
             // 更新头像
             const avatarElement = document.getElementById('user-avatar');
             
-            // 优先使用API生成的头像URL
-            if (user.id) {
-                const avatarUrl = generateAvatarUrl(user.id, 100);
-                if (avatarUrl) {
-                    avatarElement.src = avatarUrl;
-                    avatarElement.onerror = function() {
-                        // 如果API URL加载失败，回退到传统方式
-                        useTraditionalAvatarMethod();
-                    };
-                } else {
-                    useTraditionalAvatarMethod();
-                }
-            } else {
-                useTraditionalAvatarMethod();
+            // 设置用户头像
+            if (user.avatar_url) {
+                avatarElement.src = user.avatar_url;
             }
-            
-            // 传统方式处理头像
-            function useTraditionalAvatarMethod() {
-                if (user.avatar || user.picture || user.avatar_url) {
-                    const avatarData = user.avatar || user.picture || user.avatar_url;
-                    
-                    // 检查是否是有效的URL
-                    if (avatarData.startsWith('http://') || avatarData.startsWith('https://')) {
-                        avatarElement.src = avatarData;
-                    }
-                    // 检查是否已经是data URI
-                    else if (avatarData.startsWith('data:')) {
-                        avatarElement.src = avatarData;
-                    }
-                    // 如果是纯base64数据
-                    else {
-                        avatarElement.src = `data:image/png;base64,${avatarData}`;
-                    }
+            // 备选方案，如果avatar_url不存在但有其他头像字段
+            else if (user.avatar || user.picture) {
+                const avatarData = user.avatar || user.picture;
+                
+                // 检查是否是有效的URL或data URI
+                if (avatarData.startsWith('http://') || 
+                    avatarData.startsWith('https://') || 
+                    avatarData.startsWith('data:')) {
+                    avatarElement.src = avatarData;
                 }
             }
             
-            // 根据可能的字段获取用户名
+            // 获取用户名
             const username = user.preferred_username || user.name || user.username || '';
             
-            // 更新用户名
+            // 更新用户名显示
             document.getElementById('user-name').textContent = username;
             document.getElementById('info-name').textContent = username;
+            
+            // 更新下拉菜单中的用户信息
+            if (!dropdownUserName) dropdownUserName = document.getElementById('dropdown-user-name');
+            if (!dropdownUserEmail) dropdownUserEmail = document.getElementById('dropdown-user-email');
+            
+            if (dropdownUserName) dropdownUserName.textContent = username.toUpperCase();
+            if (dropdownUserEmail) dropdownUserEmail.textContent = user.email || '';
             
             // 更新邮箱
             document.getElementById('user-email').textContent = user.email || '';
@@ -374,38 +695,16 @@
                 // 91+次：红色
                 progressBar.style.backgroundColor = '#f44336';
             }
-            
-            // 可以添加更多字段的显示，如ID、创建时间、最后登录时间等
-            console.log('用户信息:', user);
         }
 
-        // 生成用户头像URL的函数（使用新API）
-        function generateAvatarUrl(userId, size) {
-            if (!userId) return null;
-            
-            // 使用完整的UUID
-            const fullUuid = userId;
-            
-            // 构建基本URL
-            let url = `/api/service/${fullUuid}/avatar.png`;
-            
-            // 如果指定了尺寸，添加查询参数
-            if (size) {
-                url += `?width=${size}&height=${size}`;
-            }
-            
-            return url;
-        }
-
-        // 获取登录统计信息，用于更新最近登录的客户端
+        // 获取登录统计信息
         async function fetchLoginStats() {
             try {
                 const response = await fetch('/api/user/login-stats');
                 
                 if (!response.ok) {
-                    // 如果响应不成功，处理错误
+                    // 处理错误但不重定向
                     if (response.status === 401) {
-                        window.location.href = '/';
                         return;
                     }
                     throw new Error('获取登录统计失败');
@@ -420,7 +719,6 @@
                     displayRecentClientsError('无法获取客户端统计信息');
                 }
             } catch (error) {
-                console.error('获取登录统计出错:', error);
                 displayRecentClientsError('无法加载登录统计信息');
             }
         }
@@ -506,6 +804,48 @@
             } else {
                 return '刚刚';
             }
+        }
+
+        // 上传头像
+        async function uploadAvatar(file) {
+            try {
+                // 创建FormData对象
+                const formData = new FormData();
+                formData.append('avatar', file);
+                
+                // 发送请求
+                const uploadResponse = await fetch('/api/upload-avatar', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!uploadResponse.ok) {
+                    const errorData = await uploadResponse.json();
+                    throw new Error(errorData.error || '上传头像失败');
+                }
+                
+                // 上传成功
+                showToast('头像上传成功', 'success');
+                
+                // 重新加载用户信息以更新头像
+                setTimeout(() => {
+                    fetchUserInfo();
+                }, 1000);
+                
+            } catch (error) {
+                showToast(error.message || '上传头像失败', 'error');
+            }
+        }
+        
+        // 显示消息提示
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast show ' + type;
+            
+            setTimeout(() => {
+                toast.className = 'toast';
+            }, 3000);
         }
     </script>
 </body>

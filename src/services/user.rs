@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use crate::errors::{AppError, AppResult};
 use crate::models::{AdminUserResponse, ClientLoginStat, LoginHistoryResponse, LoginRecord, LoginStatsResponse, OpenIdUserResponse, SelfUserResponse, User, UserCreate};
 use crate::utils::password;
+use crate::routes::service::get_default_avatar;
 
 // 查找用户ID是否存在
 pub async fn find_user_by_id(id: Uuid, db: &PgPool) -> AppResult<Option<User>> {
@@ -38,10 +39,11 @@ pub async fn create_user(user: &UserCreate, db: &PgPool) -> AppResult<User> {
     let now = Utc::now();
     let user_id = Uuid::new_v4();
     
+    // 创建用户并使用存储头像的专用函数
     let user = query_as::<_, User>(
         r#"
-        INSERT INTO users (id, username, email, password_hash, created_at, updated_at, email_verified, avatar)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        INSERT INTO users (id, username, email, password_hash, created_at, updated_at, email_verified)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *
         "#)
     .bind(user_id)
@@ -51,12 +53,34 @@ pub async fn create_user(user: &UserCreate, db: &PgPool) -> AppResult<User> {
     .bind(now)
     .bind(now)
     .bind(false) // 默认email_verified为false
-    .bind(None::<String>) // 默认avatar为None
     .fetch_one(db)
     .await
     .map_err(AppError::DatabaseError)?;
     
-    Ok(user)
+    // 设置默认头像
+    let default_avatar = get_default_avatar();
+    
+    // 使用update_user函数更新头像字段
+    match update_user(
+        user_id,
+        None,
+        None,
+        Some(default_avatar.to_string()),
+        db
+    ).await {
+        Ok(_) => {
+            // 成功设置默认头像后，重新获取用户
+            match find_user_by_id(user_id, db).await {
+                Ok(Some(updated_user)) => Ok(updated_user),
+                _ => Ok(user) // 如果无法获取更新后的用户，返回原始用户
+            }
+        },
+        Err(e) => {
+            // 设置默认头像失败，记录错误但仍返回创建的用户
+            log::error!("设置默认头像失败: {}", e);
+            Ok(user)
+        }
+    }
 }
 
 // pub async fn get_user_by_id(id: Uuid, db: &PgPool) -> AppResult<OpenIdUserResponse> {

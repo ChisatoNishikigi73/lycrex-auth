@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use crate::models::User;
 use crate::models::oauth::interface::OAuthResponse;
+use crate::routes::service::get_avatar_url_by_id;
 
 /// Lycrex 用户响应结构体
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -14,7 +15,7 @@ pub struct LycrexUserResponse {
     
     // Lycrex特殊字段
     pub id: String,
-    pub avatar: Option<String>,
+    pub avatar_url: Option<String>,
     pub lycrex_id: String,
     pub permissions: Vec<String>,
     pub created_at: String,
@@ -35,7 +36,7 @@ impl OAuthResponse for LycrexUserResponse {
             
             // Lycrex特有字段
             id: id_str.clone(),
-            avatar: user.avatar.clone(),
+            avatar_url: Some(get_avatar_url_by_id(user.id)),
             lycrex_id: id_str,
             permissions: vec!["user".to_string()],
             created_at: user.created_at.to_rfc3339(),

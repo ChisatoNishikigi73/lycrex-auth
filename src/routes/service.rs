@@ -23,7 +23,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
 }
 
 /// 根据UUID获取用户头像
-#[get("/avatar/{uuid}")]
+#[get("/profile/{uuid}/avatar")]
 async fn get_user_avatar(
     path: web::Path<String>,
     query: web::Query<ImageParams>,
@@ -52,7 +52,7 @@ async fn get_user_avatar(
             if let Some(avatar_base64) = user.avatar {
                 // 尝试将base64解码为图像数据
                 match decode_avatar_base64(&avatar_base64) {
-                    Ok(image_data) => {
+                    Ok((image_data, content_type)) => {
                         // 尺寸调整标记，用于生成ETag
                         let size_tag = match (width, height) {
                             (Some(w), Some(h)) => format!("_{}x{}", w, h),
@@ -74,22 +74,39 @@ async fn get_user_avatar(
                         
                         // 设置缓存头，一天的缓存时间
                         HttpResponse::Ok()
-                            .content_type("image/png")
+                            .content_type(content_type)
                             .append_header(("ETag", etag))
                             .append_header(("Cache-Control", "public, max-age=86400"))
                             .body(image_data)
                     },
-                    Err(_) => {
-                        HttpResponse::InternalServerError()
+                    Err(e) => {
+                        // 解码头像失败，返回错误信息
+                        HttpResponse::BadRequest()
                             .content_type("application/json")
-                            .json(serde_json::json!({ "error": "无法解码头像数据" }))
+                            .json(serde_json::json!({ 
+                                "error": "无法解码头像数据", 
+                                "details": format!("不支持的头像格式或数据错误: {:?}", e)
+                            }))
                     }
                 }
             } else {
-                // 用户没有头像，返回404
-                HttpResponse::NotFound()
-                    .content_type("application/json")
-                    .json(serde_json::json!({ "error": "用户没有头像" }))
+                // 用户没有头像，返回默认头像
+                let default_avatar = get_default_avatar();
+                match decode_avatar_base64(default_avatar) {
+                    Ok((image_data, content_type)) => {
+                        // 返回默认头像
+                        HttpResponse::Ok()
+                            .content_type(content_type)
+                            .append_header(("Cache-Control", "public, max-age=86400"))
+                            .body(image_data)
+                    },
+                    Err(_) => {
+                        // 默认头像也解码失败，这是内部错误
+                        HttpResponse::InternalServerError()
+                            .content_type("application/json")
+                            .json(serde_json::json!({ "error": "无法解码默认头像数据" }))
+                    }
+                }
             }
         },
         Ok(None) => {
@@ -98,29 +115,76 @@ async fn get_user_avatar(
                 .content_type("application/json")
                 .json(serde_json::json!({ "error": "用户不存在" }))
         },
-        Err(e) => {
+        Err(_) => {
             // 数据库错误，返回500
             HttpResponse::InternalServerError()
                 .content_type("application/json")
-                .json(serde_json::json!({ "error": format!("服务器错误: {}", e) }))
+                .json(serde_json::json!({ "error": "无法解码默认头像数据" }))
         }
     }
 }
 
 /// 解码Base64编码的头像数据
-fn decode_avatar_base64(avatar_base64: &str) -> Result<Vec<u8>, base64::DecodeError> {
-    // 检查是否已经包含data:前缀
-    let base64_data = if avatar_base64.starts_with("data:image") {
-        // 提取实际的base64部分
-        avatar_base64.split(',').nth(1).unwrap_or(avatar_base64)
+fn decode_avatar_base64(avatar_base64: &str) -> Result<(Vec<u8>, &'static str), base64::DecodeError> {
+    // 检查是否包含data:image前缀，如果没有则返回错误
+    if avatar_base64.starts_with("data:image") {
+        // 从data URI中提取内容类型和数据
+        let parts: Vec<&str> = avatar_base64.split(',').collect();
+        let mime_part = parts.get(0).unwrap_or(&"");
+        
+        // 根据MIME类型设置内容类型
+        let content_type = if mime_part.contains("image/gif") {
+            "image/gif"
+        } else if mime_part.contains("image/jpeg") || mime_part.contains("image/jpg") {
+            "image/jpeg"
+        } else {
+            // 默认为PNG
+            "image/png"
+        };
+        
+        // 提取base64部分，如果不存在则使用原始字符串
+        let data_part = parts.get(1).unwrap_or(&avatar_base64);
+        // 解码base64数据
+        STANDARD.decode(data_part).map(|data| (data, content_type))
+    } else if avatar_base64.starts_with("R0lGOD") {
+        // 特殊处理：如果是以GIF头部标识开始，但没有data:URI前缀
+        STANDARD.decode(avatar_base64).map(|data| (data, "image/gif"))
+    } else if avatar_base64.starts_with("iVBOR") {
+        // 特殊处理：如果是以PNG头部标识开始，但没有data:URI前缀
+        STANDARD.decode(avatar_base64).map(|data| (data, "image/png"))
+    } else if avatar_base64.starts_with("/9j/") {
+        // 特殊处理：如果是以JPEG头部标识开始，但没有data:URI前缀
+        STANDARD.decode(avatar_base64).map(|data| (data, "image/jpeg"))
     } else {
-        avatar_base64
-    };
-    
-    // 解码base64数据
-    STANDARD.decode(base64_data)
-} 
+        // 不支持的格式，返回解码错误
+        Err(base64::DecodeError::InvalidLength)
+    }
+}
 
+/// 获取默认头像base64编码 - 随机颜色和GIF版本
+pub fn get_default_avatar() -> &'static str {
+    // 包含静态图像和动态GIF的随机头像集合
+    const AVATARS: [&str; 6] = [
+        // 静态头像 (PNG格式)
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAA1JREFUGFdj+O/g8B8ABkACf3lhiWUAAAAASUVORK5CYII=", // 红色
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAA1JREFUGFdjuO/w/z8ABz4DHq/5iIEAAAAASUVORK5CYII=", // 紫色
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAA1JREFUGFdjcHD+/x8ABMsCgoKDrMQAAAAASUVORK5CYII=", // 靛色
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAA1JREFUGFdjcHj0/z8ABqgDIRlracMAAAAASUVORK5CYII=", // 蓝色
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAA1JREFUGFdjcPjv9h8ABY0ChShIeUEAAAAASUVORK5CYII=", // 绿色
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAA1JREFUGFdj+H/I4T8AB8YDAazATdkAAAAASUVORK5CYII=", // 黄色
+        ];
+    
+    // 获取当前时间戳作为随机种子
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    
+    // 简单的随机选择
+    AVATARS[timestamp as usize % AVATARS.len()]
+}
+
+/// 获取用户头像URL
 pub fn get_avatar_url_by_id(user_id: Uuid) -> String {
-    format!("http://127.0.0.1:8080/api/service/avatar/{}", user_id)
+    format!("http://127.0.0.1:8080/api/service/profile/{}/avatar", user_id)
 }

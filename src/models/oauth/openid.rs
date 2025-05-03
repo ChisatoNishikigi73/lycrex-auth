@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use crate::models::User;
 use crate::models::oauth::interface::OAuthResponse;
+use crate::routes::service::get_avatar_url_by_id;
 
 /// OpenID Connect标准用户响应结构体
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -16,12 +17,8 @@ pub struct OpenIdUserResponse {
 // 实现OAuthResponse接口
 impl OAuthResponse for OpenIdUserResponse {
     fn from_user(user: &User) -> Self {
-        // 如果avatar存在，生成临时URL或直接使用base64数据
-        let picture = user.avatar.clone().map(|avatar| {
-            // 如果avatar已经是base64编码，直接返回
-            // 实际使用时可以考虑生成临时URL
-            format!("data:image/png;base64,{}", avatar)
-        });
+        // 无论用户是否有头像，都返回头像URL
+        let picture = Some(get_avatar_url_by_id(user.id));
         
         Self {
             sub: user.id.to_string(),
