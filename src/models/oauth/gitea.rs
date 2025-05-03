@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use crate::models::User;
 use crate::models::oauth::interface::OAuthResponse;
+use crate::routes::service::get_avatar_url_by_id;
 
 /// Gitea兼容用户响应结构体 (扩展自OpenID标准)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,11 +26,7 @@ impl OAuthResponse for GiteaUserResponse {
         let id_str = user.id.to_string();
         
         // 从用户的avatar字段生成avatar_url
-        let avatar_url = user.avatar.clone().map(|avatar| {
-            // 如果需要生成URL，可以在此处理
-            // 目前直接返回base64格式
-            format!("data:image/png;base64,{}", avatar)
-        });
+        let avatar_url = Some(get_avatar_url_by_id(user.id));
         
         Self {
             sub: id_str.clone(),
