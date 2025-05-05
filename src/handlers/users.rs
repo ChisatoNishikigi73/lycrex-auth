@@ -18,6 +18,17 @@ pub struct UpdateUserRequest {
     avatar: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ChangePasswordRequest {
+    old_password: String,
+    new_password: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ChangeUsernameRequest {
+    username: String,
+}
+
 // 获取当前用户信息
 pub async fn get_current_user(
     user: web::ReqData<AuthenticatedUser>,
@@ -180,5 +191,60 @@ pub async fn upload_avatar(
         }
     } else {
         HttpResponse::BadRequest().json("未找到头像文件或处理失败")
+    }
+}
+
+// 修改密码
+pub async fn change_password(
+    path: web::Path<Uuid>,
+    user: web::ReqData<AuthenticatedUser>,
+    data: web::Json<ChangePasswordRequest>,
+    db: web::Data<PgPool>,
+) -> impl Responder {
+    // 检查是否是当前用户
+    let user_id = path.into_inner();
+    let auth_user = user.into_inner();
+    if auth_user.user_id != user_id {
+        return HttpResponse::Forbidden().json("无权修改其他用户的密码");
+    }
+    
+    match user_service::update_user_password(
+        user_id,
+        &data.old_password,
+        &data.new_password,
+        &db,
+    )
+    .await
+    {
+        Ok(user) => HttpResponse::Ok().json(user),
+        Err(err) => HttpResponse::BadRequest().json(err.to_string()),
+    }
+}
+
+// 修改用户名
+pub async fn change_username(
+    path: web::Path<Uuid>,
+    user: web::ReqData<AuthenticatedUser>,
+    data: web::Json<ChangeUsernameRequest>,
+    db: web::Data<PgPool>,
+) -> impl Responder {
+    // 检查是否是当前用户
+    let user_id = path.into_inner();
+    let auth_user = user.into_inner();
+    if auth_user.user_id != user_id {
+        return HttpResponse::Forbidden().json("无权修改其他用户的用户名");
+    }
+    
+    match user_service::update_user(
+        user_id,
+        Some(data.username.clone()),
+        None,
+        None,
+        &db,
+    )
+    .await
+    {
+        Ok(user) => HttpResponse::Ok().json(user),
+        Err(err) => HttpResponse::BadRequest().json(err.to_string()),
     }
 }

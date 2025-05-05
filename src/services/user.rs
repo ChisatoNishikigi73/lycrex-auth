@@ -514,4 +514,47 @@ pub async fn get_login_stats(
     };
     
     Ok(response)
+}
+
+/// 更新用户密码
+pub async fn update_user_password(
+    id: Uuid,
+    old_password: &str,
+    new_password: &str,
+    db: &PgPool,
+) -> AppResult<OpenIdUserResponse> {
+    // 检查用户是否存在
+    let user = query_as::<_, User>(r#"SELECT * FROM users WHERE id = $1"#)
+    .bind(id)
+    .fetch_optional(db)
+    .await
+    .map_err(AppError::DatabaseError)?
+    .ok_or_else(|| AppError::NotFound("用户未找到".to_string()))?;
+    
+    // 验证旧密码
+    let is_valid = password::verify_password(old_password, &user.password_hash)?;
+    if !is_valid {
+        return Err(AppError::ValidationError("原密码不正确".to_string()));
+    }
+    
+    // 对新密码进行哈希处理
+    let password_hash = password::hash_password(new_password)?;
+    let now = Utc::now();
+    
+    // 更新密码
+    let updated_user = query_as::<_, User>(
+        r#"
+        UPDATE users
+        SET password_hash = $1, updated_at = $2
+        WHERE id = $3
+        RETURNING *
+        "#)
+    .bind(&password_hash)
+    .bind(now)
+    .bind(id)
+    .fetch_one(db)
+    .await
+    .map_err(AppError::DatabaseError)?;
+    
+    Ok(OpenIdUserResponse::from(updated_user))
 } 
