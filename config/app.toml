@@ -10,7 +10,7 @@ port = 8080
 # 会话密钥，生产环境必须修改为复杂的随机值
 secret_key = "请在生产环境修改为随机密钥"
 # 公共URL
-public_url = "https://oauth.lycrex.com"
+public_url = "http://127.0.0.1:8080"
 
 # 数据库配置
 [database]
