@@ -103,21 +103,44 @@ jobs:
         key: ${{ secrets.SERVER_SSH_KEY }}
         port: ${{ vars.SERVER_PORT || 22 }}
         script: |
-          # 检查服务是否存在并尝试停止，但使用if语句代替&&
-          if sudo systemctl is-active --quiet ${{ vars.SERVICE_NAME }}; then
-            sudo systemctl stop ${{ vars.SERVICE_NAME }}
+          # 检查服务状态并尝试停止
+          if sudo systemctl status ${{ vars.SERVICE_NAME }} &>/dev/null; then
+            echo "服务存在，正在停止..."
+            sudo systemctl stop ${{ vars.SERVICE_NAME }} || true
+          else
+            echo "服务不存在，将在后续步骤创建"
           fi
-          echo "服务已停止或不存在，继续部署"
           
-          # 备份配置
-          [ -f "${{ vars.DEPLOY_PATH }}/.env" ] && mkdir -p /tmp/backup && cp ${{ vars.DEPLOY_PATH }}/.env /tmp/backup/
+          # 备份配置（增加错误处理）
+          if [ -f "${{ vars.DEPLOY_PATH }}/.env" ]; then
+            mkdir -p /tmp/backup || true
+            cp ${{ vars.DEPLOY_PATH }}/.env /tmp/backup/ || true
+            echo "配置已备份"
+          else
+            echo "没有找到现有配置文件，跳过备份"
+          fi
           
-          # 清空并准备目录
-          mkdir -p ${{ vars.DEPLOY_PATH }}
-          rm -rf ${{ vars.DEPLOY_PATH }}/*
+          # 清空并准备目录（增加错误处理）
+          echo "准备部署目录..."
+          mkdir -p ${{ vars.DEPLOY_PATH }} || true
+          if [ -d "${{ vars.DEPLOY_PATH }}" ]; then
+            rm -rf ${{ vars.DEPLOY_PATH }}/* || true
+            echo "目录已清空"
+          else
+            echo "无法创建部署目录，请检查权限"
+            exit 1
+          fi
           
-          # 恢复配置
-          [ -f "/tmp/backup/.env" ] && cp /tmp/backup/.env ${{ vars.DEPLOY_PATH }}/ && rm -rf /tmp/backup
+          # 恢复配置（增加错误处理）
+          if [ -f "/tmp/backup/.env" ]; then
+            cp /tmp/backup/.env ${{ vars.DEPLOY_PATH }}/ || true
+            rm -rf /tmp/backup || true
+            echo "配置已恢复"
+          else
+            echo "没有备份配置可恢复"
+          fi
+          
+          echo "服务器准备完成，等待文件上传..."
     
     - name: 上传部署文件
       uses: appleboy/scp-action@master
