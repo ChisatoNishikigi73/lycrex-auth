@@ -34,45 +34,16 @@ jobs:
           echo "没有发现子模块配置，跳过子模块处理"
         fi
     
-    - name: 创建CentOS 7构建环境
-      run: |
-        cat > Dockerfile.build << EOF
-        FROM centos:7
-        
-        # 修复镜像源
-        RUN cd /etc/yum.repos.d/ && \
-            sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-* && \
-            sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
-        
-        # 安装依赖
-        RUN yum install -y epel-release && \
-            yum clean all && yum makecache && \
-            yum -y install gcc gcc-c++ make wget git openssl-devel postgresql-devel \
-            ca-certificates curl redhat-rpm-config sudo
-        
-        # 安装Rust
-        RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-        ENV PATH="/root/.cargo/bin:${PATH}"
-        
-        WORKDIR /app
-        COPY . .
-        
-        # 创建Cargo配置
-        RUN mkdir -p /root/.cargo && \
-            echo '[profile.release]' > /root/.cargo/config && \
-            echo 'lto = true' >> /root/.cargo/config && \
-            echo 'opt-level = "z"' >> /root/.cargo/config && \
-            echo 'codegen-units = 1' >> /root/.cargo/config
-        
-        CMD cd /app && cargo build --release
-        EOF
-    
-    - name: 构建Docker镜像
-      run: docker build -t centos7-rust-builder -f Dockerfile.build .
+    - name: 安装Rust工具链
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
     
     - name: 构建应用
       run: |
-        docker run --rm -v $(pwd):/app centos7-rust-builder
+        cargo build --release
         
         if [ -f "target/release/lycrex-auth" ]; then
           echo "PKG_NAME=lycrex-auth" >> $GITHUB_ENV
@@ -132,7 +103,11 @@ jobs:
         key: ${{ secrets.SERVER_SSH_KEY }}
         port: ${{ vars.SERVER_PORT || 22 }}
         script: |
-          sudo systemctl stop ${{ vars.SERVICE_NAME }} || echo "服务未运行"
+          # 检查服务是否存在并尝试停止，但使用if语句代替&&
+          if sudo systemctl is-active --quiet ${{ vars.SERVICE_NAME }}; then
+            sudo systemctl stop ${{ vars.SERVICE_NAME }}
+          fi
+          echo "服务已停止或不存在，继续部署"
           
           # 备份配置
           [ -f "${{ vars.DEPLOY_PATH }}/.env" ] && mkdir -p /tmp/backup && cp ${{ vars.DEPLOY_PATH }}/.env /tmp/backup/
@@ -156,55 +131,6 @@ jobs:
         target: "${{ vars.DEPLOY_PATH }}"
         strip_components: 1
         
-    - name: 准备服务器环境
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ vars.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USERNAME }}
-        password: ${{ secrets.SERVER_PASSWORD }}
-        key: ${{ secrets.SERVER_SSH_KEY }}
-        port: ${{ vars.SERVER_PORT || 22 }}
-        script: |
-          # 安装依赖
-          sudo yum install -y gcc make perl pcre-devel zlib-devel wget postgresql-libs
-          
-          # 安装OpenSSL 3.0
-          cd /tmp
-          if [ ! -f openssl-3.0.8.tar.gz ]; then
-            wget https://www.openssl.org/source/openssl-3.0.8.tar.gz
-            tar -zxf openssl-3.0.8.tar.gz
-          fi
-          
-          if [ -d openssl-3.0.8 ]; then
-            cd openssl-3.0.8
-            ./config --prefix=/usr/local/openssl-3.0 --openssldir=/usr/local/openssl-3.0 shared
-            make -j$(nproc)
-            sudo make install
-            
-            # 设置库文件链接
-            LIBSSL_PATH=$(find /usr/local/openssl-3.0 -name "libssl.so.3" | head -n 1)
-            LIBCRYPTO_PATH=$(find /usr/local/openssl-3.0 -name "libcrypto.so.3" | head -n 1)
-            
-            if [ -n "$LIBSSL_PATH" ] && [ -n "$LIBCRYPTO_PATH" ]; then
-              sudo ln -sf $LIBSSL_PATH /usr/lib64/libssl.so.3
-              sudo ln -sf $LIBCRYPTO_PATH /usr/lib64/libcrypto.so.3
-              sudo ldconfig
-            else
-              # 备选方案
-              sudo yum install -y epel-release openssl11 openssl11-devel
-              [ -f /usr/lib64/libssl.so.1.1 ] && sudo ln -sf /usr/lib64/libssl.so.1.1 /usr/lib64/libssl.so.3
-              [ -f /usr/lib64/libcrypto.so.1.1 ] && sudo ln -sf /usr/lib64/libcrypto.so.1.1 /usr/lib64/libcrypto.so.3
-              sudo ldconfig
-            fi
-          fi
-          
-          # 设置环境变量
-          echo "export LD_LIBRARY_PATH=/usr/local/openssl-3.0/lib64:/usr/local/openssl-3.0/lib:\$LD_LIBRARY_PATH" | sudo tee /etc/profile.d/openssl3.sh
-          sudo chmod +x /etc/profile.d/openssl3.sh
-          
-          # 更新服务配置
-          [ -f /etc/systemd/system/${{ vars.SERVICE_NAME }}.service ] && sudo sed -i '/^\[Service\]/a Environment="LD_LIBRARY_PATH=/usr/local/openssl-3.0/lib64:/usr/local/openssl-3.0/lib"' /etc/systemd/system/${{ vars.SERVICE_NAME }}.service && sudo systemctl daemon-reload
-          
     - name: 配置服务
       uses: appleboy/ssh-action@master
       with:
@@ -245,7 +171,6 @@ jobs:
           StandardOutput=journal
           StandardError=journal
           Environment="RUST_LOG=info,sqlx=off,sqlx::query=off"
-          Environment="LD_LIBRARY_PATH=/usr/local/openssl-3.0/lib64:/usr/local/openssl-3.0/lib"
           Environment="RUN_ENV=production"
           Environment="POSTGRES_USER=${{ secrets.DB_USER || secrets.SERVER_USERNAME }}"
           Environment="POSTGRES_PASSWORD=${{ secrets.DB_PASSWORD }}"
@@ -261,6 +186,6 @@ jobs:
           fi
           
           # 启动服务但不检查状态
-          sudo systemctl enable ${{ vars.SERVICE_NAME }}
-          sudo systemctl start ${{ vars.SERVICE_NAME }} || echo "服务启动命令已执行"
+          sudo systemctl enable ${{ vars.SERVICE_NAME }} || true
+          sudo systemctl start ${{ vars.SERVICE_NAME }} || true
           echo "Lycrex Auth Service 部署完成" 
